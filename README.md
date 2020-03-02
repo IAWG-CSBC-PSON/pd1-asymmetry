@@ -1,6 +1,6 @@
 # PD1 asymmetry challenge
 
-Challenge organizer: Artem Sokolov
+Challenge organizer: Yury Goltsev
 
 ## Create conda environment
 
