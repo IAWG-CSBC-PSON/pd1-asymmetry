@@ -1,15 +1,3 @@
-''' Create a simple stocks correlation dashboard.
-Choose stocks to compare in the drop down widgets, and make selections
-on the plots to update the summary and histograms accordingly.
-.. note::
-    Running this example requires downloading sample data. See
-    the included `README`_ for more information.
-Use the ``bokeh serve`` command to run the example by executing:
-    bokeh serve stocks
-at your command prompt. Then navigate to the URL
-    http://localhost:5006/stocks
-.. _README: https://github.com/bokeh/bokeh/blob/master/examples/app/stocks/README.md
-'''
 from functools import lru_cache
 from os.path import dirname, join
 
@@ -25,22 +13,14 @@ from bokeh.models import ColumnDataSource, PreText, Select, ColorBar, RangeSlide
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
 
-umap_data = pd.read_csv("test.csv", index_col=False)
-cell_stack = np.load("reg005_X04_Y04_tensor.npy")
-input_data = pd.read_csv("reg005_X04_Y04_tensor_data.csv", index_col=False)
-input_data["u1"] = umap_data["u1"][:len(input_data.index)]
-input_data["u2"] = umap_data["u2"][:len(input_data.index)]
-
-def nix(val, lst):
-    return [x for x in lst if x != val]
+input_data = pd.read_csv("umap_pd1+_all_channels.csv", index_col=False)
+cell_stack = np.load("all_cells_tensor.npy")
 
 @lru_cache()
 def get_data(m):
     d = input_data
     if m is not None:
         d["marker_val"] = d[m]
-    # if m is not None:
-        # d["marker_color"] = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*mpl.cm.viridis(mpl.colors.Normalize()(d[m]))]
     return d
 
 # set up widgets
@@ -62,20 +42,22 @@ marker_mapper = linear_cmap(field_name="marker_val", palette=inferno(8)[:-1], lo
 
 umap_figure = figure(plot_width=800, plot_height=500,
               tools='pan,wheel_zoom,lasso_select,box_select,reset')
-umap_figure.circle('u1', 'u2', size=3, source=source,
+umap_figure.circle('d1', 'd2', size=3, source=source,
             line_color=marker_mapper, color=marker_mapper,
             selection_color="orange", alpha=0.6, nonselection_alpha=0.4, selection_alpha=0.8
 )
-color_bar = ColorBar(color_mapper=marker_mapper['transform'], width=8, location=(0,0))
-umap_figure.add_layout(color_bar, 'right')
+umap_color_bar = ColorBar(color_mapper=marker_mapper['transform'], width=8, location=(0,0))
+umap_figure.add_layout(umap_color_bar, "right")
 
-cell_mapper = bokeh.models.mappers.LinearColorMapper(viridis(5), low=0, high=1000, high_color=None)
-cell_figure = figure(plot_width=350, plot_height=350,
+cell_mapper = bokeh.models.mappers.LinearColorMapper(viridis(10), low=0, high=1000, high_color=None)
+cell_color_bar = ColorBar(color_mapper=cell_mapper, width=8, location=(0,0))
+cell_figure = figure(plot_width=450, plot_height=350,
               tools='pan,wheel_zoom,reset')
 cell_image = cell_figure.image(
     image="image", color_mapper=cell_mapper,
     x=0, y=0, dw="dw", dh="dh", source=image_source
 )
+cell_figure.add_layout(cell_color_bar, "right")
 
 # set up callbacks
 
