@@ -18,11 +18,12 @@ import numpy as np
 import matplotlib as mpl
 
 import bokeh
-from bokeh.palettes import viridis
+from bokeh.palettes import viridis, inferno
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, PreText, Select
+from bokeh.models import ColumnDataSource, PreText, Select, ColorBar, RangeSlider
 from bokeh.plotting import figure
+from bokeh.transform import linear_cmap
 
 umap_data = pd.read_csv("test.csv", index_col=False)
 cell_stack = np.load("reg005_X04_Y04_tensor.npy")
@@ -36,6 +37,8 @@ def nix(val, lst):
 @lru_cache()
 def get_data(m):
     d = input_data
+    if m is not None:
+        d["marker_val"] = d[m]
     # if m is not None:
         # d["marker_color"] = ["#%02x%02x%02x" % (int(r), int(g), int(b)) for r, g, b, _ in 255*mpl.cm.viridis(mpl.colors.Normalize()(d[m]))]
     return d
@@ -47,20 +50,28 @@ marker_cols = list(input_data.select_dtypes(include=np.number).columns)
 stats = PreText(text='', width=500)
 marker_select = Select(value="CD25", options=marker_cols)
 
+marker_slider = RangeSlider(start=0, end=1, value=(0, 1))
+
 # set up plots
 
 source = ColumnDataSource(data=input_data)
 image_source = ColumnDataSource(data=dict(image=[], dw=[], dh=[]))
 
-umap_figure = figure(plot_width=350, plot_height=350,
+marker_mapper = linear_cmap(field_name="marker_val", palette=inferno(8)[:-1], low=0, high=500)
+
+umap_figure = figure(plot_width=800, plot_height=500,
               tools='pan,wheel_zoom,lasso_select,box_select,reset')
-umap_figure.circle('u1', 'u2', size=1, source=source,
-            selection_color="orange", alpha=0.6, nonselection_alpha=0.1, selection_alpha=0.4)
+umap_figure.circle('u1', 'u2', size=2, source=source,
+            line_color=marker_mapper, color=marker_mapper,
+            selection_color="orange", alpha=0.6, nonselection_alpha=0.4, selection_alpha=0.8
+)
+color_bar = ColorBar(color_mapper=marker_mapper['transform'], width=8, location=(0,0))
+umap_figure.add_layout(color_bar, 'right')
 
 cell_figure = figure(plot_width=350, plot_height=350,
               tools='pan,wheel_zoom,reset')
 cell_image = cell_figure.image(
-    image="image", color_mapper=bokeh.models.mappers.LinearColorMapper(viridis(5), low=0, high=1000),
+    image="image", color_mapper=bokeh.models.mappers.LinearColorMapper(viridis(5), low=0, high=1000, high_color=None),
     x=0, y=0, dw="dw", dh="dh", source=image_source
 )
 
@@ -70,9 +81,20 @@ def marker_change(attrname, old, new):
     # marker_select.options = nix(new, marker_cols)
     update()
 
+
+def marker_slider_change(attrname, old, new):
+    marker_mapper["transform"].low = new[0]
+    marker_mapper["transform"].high = new[1]
+
 def update(selected=None):
     m = marker_select.value
-    source.data = get_data(m)
+    d = get_data(m)
+    source.data = d
+    marker_max = d["marker_val"].max()
+    marker_min = d["marker_val"].min()
+    marker_slider.start = marker_min
+    marker_slider.end = marker_max
+    marker_slider.value = (marker_min, marker_max)
     umap_figure.title.text = 'UMAP with marker %s' % (m)
 
 def selection_change(attrname, old, new):
@@ -92,10 +114,11 @@ def selection_change(attrname, old, new):
 
 source.selected.on_change('indices', selection_change)
 marker_select.on_change('value', marker_change)
+marker_slider.on_change("value", marker_slider_change)
 
 # set up layout
 widgets = column(marker_select, stats)
-main_row = row(umap_figure, widgets, cell_figure)
+main_row = row(column(umap_figure, marker_slider), widgets, cell_figure)
 layout = column(main_row)
 
 # initialize
