@@ -56,7 +56,7 @@ def prepare_server(doc, input_data_file, cell_stack_file):
     umap_figure.circle(
         "d1",
         "d2",
-        size=3,
+        size=4,
         source=source,
         line_color=marker_mapper,
         color=marker_mapper,
@@ -108,7 +108,7 @@ def prepare_server(doc, input_data_file, cell_stack_file):
         marker_min = d["marker_val"].min()
         marker_slider.start = marker_min
         marker_slider.end = marker_max
-        marker_slider.value = (marker_min, marker_max)
+        marker_slider.value = tuple(np.percentile(d["marker_val"], [5, 95]))
         umap_figure.title.text = "UMAP with marker %s" % (m)
 
     def selection_change(attrname, old, new):
@@ -126,7 +126,7 @@ def prepare_server(doc, input_data_file, cell_stack_file):
         image_extr = mean_image.min(), mean_image.max()
         cell_slider.start = image_extr[0]
         cell_slider.end = image_extr[1]
-        cell_slider.value = (image_extr[0], image_extr[1])
+        cell_slider.value = image_extr
         stats.text = "n cells: " + str(len(selected))
 
     source.selected.on_change("indices", selection_change)
