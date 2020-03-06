@@ -2,7 +2,7 @@
 
 import click
 import asym
-
+from asym.run_umap import run_umap
 
 @click.group()
 def cli():
@@ -19,6 +19,15 @@ def cli():
 def train(cell_stack, output_path, tensor_size, epochs):
     """Train autoencoder network"""
     print(cell_stack)
+    
+
+@cli.command()
+@click.argument("encodings", type=click.File("r"))
+@click.argument("metadata", type=click.File("r"))
+@click.option("--save_path",default=None,type=click.Path(file_okay=True, dir_okay=False, resolve_path=True))
+def umap(encodings, metadata, save_path):
+    """Compute UMAP embedding of cells"""
+	run_umap(encodings, metadata, save_path)
 
 
 @cli.command()
@@ -46,7 +55,6 @@ def vis(cell_stack, cell_data, port):
     }
     server = Server(apps, port=port)
     server.run_until_shutdown()
-
 
 if __name__ == "__main__":
     cli()
