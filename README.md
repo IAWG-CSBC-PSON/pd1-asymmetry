@@ -17,7 +17,7 @@ To create a conda environment called `pd1` for the challenge:
 
 ## Install asym python package
 
-    pip install git+https://github.com/clemenshug/pd1-asymmetry.git
+    pip install git+https://github.com/IAWG-CSBC-PSON/pd1-asymmetry.git
 
 ## Getting started
 
