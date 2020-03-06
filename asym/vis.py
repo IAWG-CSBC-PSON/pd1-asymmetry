@@ -1,9 +1,6 @@
 from functools import lru_cache
-from os.path import dirname, join
-
 import pandas as pd
 import numpy as np
-import matplotlib as mpl
 
 import bokeh
 from bokeh.palettes import viridis, inferno
@@ -20,17 +17,17 @@ def prepare_server(doc, input_data_file, cell_stack_file):
 
     @lru_cache()
     def get_data(m):
-        d = input_data
+        d = input_data.copy()
         if m is not None:
             d["marker_val"] = d[m]
         return d
 
     # set up widgets
 
-    marker_cols = list(input_data.select_dtypes(include=np.number).columns)
+    marker_cols = list(sorted(input_data.select_dtypes(include=np.number).columns))
 
     stats = PreText(text="", width=200)
-    marker_select = Select(value="CD25", options=marker_cols)
+    marker_select = Select(value=marker_cols[0], options=marker_cols)
 
     marker_slider = RangeSlider(start=0, end=1, value=(0, 1))
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))

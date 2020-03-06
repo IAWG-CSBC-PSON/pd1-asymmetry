@@ -14,6 +14,14 @@ setuptools.setup(
         "Operating System :: OS Independent",
     ],
     python_requires=">=3.6",
-    install_requires=["click"],
+    install_requires=[
+        "click",
+        "numpy",
+        "pandas",
+        "pillow",
+        "bokeh",
+        "torch",
+        "matplotlib",
+    ],
     scripts=["bin/asym"],
 )
