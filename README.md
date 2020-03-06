@@ -15,6 +15,10 @@ To create a conda environment called `pd1` for the challenge:
 
     conda activate pd1
 
+## Install asym python package
+
+    pip install git+https://github.com/clemenshug/pd1-asymmetry.git
+
 ## Getting started
 
 There's an example Jupyter notebook in this repository, with a starter
