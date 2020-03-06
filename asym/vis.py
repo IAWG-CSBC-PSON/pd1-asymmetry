@@ -29,7 +29,7 @@ def prepare_server(doc, input_data_file, cell_stack_file):
     stats = PreText(text="", width=200)
     marker_select = Select(value=marker_cols[0], options=marker_cols)
 
-    marker_slider = RangeSlider(start=0, end=1, value=(0, 1))
+    marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))
 
     # set up plots
@@ -48,7 +48,7 @@ def prepare_server(doc, input_data_file, cell_stack_file):
     umap_figure = figure(
         plot_width=800,
         plot_height=500,
-        tools="pan,wheel_zoom,lasso_select,box_select,reset",
+        tools="pan,wheel_zoom,lasso_select,box_select,tap,reset",
     )
     umap_figure.circle(
         "d1",
