@@ -86,6 +86,13 @@ class VAE(nn.Module):
     def reparameterize(self, mu, logvar):
         std = logvar.mul(0.5).exp_()
         esp = torch.randn(*mu.size())
+        if self.have_cuda:
+            std.cuda()
+            esp = esp.cuda()
+            mu.cuda()
+            logvar.cuda()
+        # import ipdb
+        # ipdb.set_trace()
         z = mu + std * esp
         return z
 
@@ -99,7 +106,10 @@ class VAE(nn.Module):
 
     def forward(self, x):
         h = self.encoder(x)
-        ei = nn.Linear(h.shape[1], self.h_dim)(h)
+        ll = nn.Linear(h.shape[1], self.h_dim)
+        if self.have_cuda:
+            ll.cuda()
+        ei = ll(h)
         z, mu, logvar = self.bottleneck(ei)
         di = self.fc3(z)
         return self.decoder(di), z, mu, logvar

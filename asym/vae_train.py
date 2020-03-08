@@ -120,6 +120,7 @@ def train_vae(
     if cuda:
         model.cuda()
 
+
     print(model)
 
     optimizer = optim.Adam(model.parameters(), lr=5e-4)
