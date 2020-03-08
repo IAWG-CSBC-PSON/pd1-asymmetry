@@ -13,6 +13,7 @@ import numpy as np
 import json
 import datetime
 import os
+from pathlib import Path
 from . import vae
 
 
@@ -125,13 +126,11 @@ def train_vae(
 
     optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
-    outf = outf + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    if not os.path.exists(outf):
-        os.makedirs(outf)
-    outf_samples = outf + "/samples"
-    os.makedirs(outf_samples)
+    outf = Path(outf + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+    if not outf.exists():
+        outf.mkdir()
 
-    with open(outf + "/model.txt", "w") as f1:
+    with open(outf / "model.txt", "w") as f1:
         print(model, file=f1)
 
     def train(epoch):
@@ -163,7 +162,7 @@ def train_vae(
             )
         )
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), "%s/vae_epoch_%d.pth" % (outf, epoch))
+            torch.save(model.state_dict(), str(outf / "vae_epoch_%d.pth" % epoch))
 
     def encode():
         model.eval()
@@ -202,8 +201,9 @@ def train_vae(
         + str(nz)
     )
 
-    encodings.to_csv(file_prefix + "_encodings.csv", sep=",", index=False, header=False)
+    torch.save(model, str(outf / "trained_model.pkl"))
+    encodings.to_csv(outf / (file_prefix + "_encodings.csv"), sep=",", index=False, header=False)
     pd.DataFrame(umap_embed).to_csv(
-        file_prefix + "umap_encodings.csv", sep=",", header=False, index=False
+        outf / (file_prefix + "umap_encodings.csv"), sep=",", header=False, index=False
     )
-    img.save(file_prefix + "umap_projection.png")
+    img.save(outf / (file_prefix + "umap_projection.png"))
