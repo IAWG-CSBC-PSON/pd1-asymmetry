@@ -21,13 +21,12 @@ class VAEDataset(Dataset):
             self.data = data_file
         self.data = self.data[..., np.newaxis]
         self.data = np.moveaxis(self.data, 3, 1)
-        self.data = self.data / ((2 ** 16) - 1)
         self.data = torch.Tensor(self.data)
         self.transform = transform
         self.normalize()
 
     def normalize(self):
-        self.data = np.stack([i / i.max() for i in self.data])
+        self.data = np.stack([(i - i.min()) / (i.max() - i.min()) for i in self.data])
 
     def __len__(self):
         return len(self.data)

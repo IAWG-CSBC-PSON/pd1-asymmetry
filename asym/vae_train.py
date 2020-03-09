@@ -181,7 +181,7 @@ def train_vae(
             if cuda:
                 data = data.cuda()
             recon_batch, z, mu, logvar = model(data)
-            encodings = encodings.append(pd.DataFrame(z.cpu().numpy()))
+            encodings = encodings.append(pd.DataFrame(z.cpu().detach().numpy()))
         return encodings
 
     for epoch in range(1, epochs + 1):
