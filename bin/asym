@@ -13,6 +13,9 @@ def cli():
 @cli.command()
 @click.argument("cell_stack", type=click.File("rb"))
 @click.argument("output_folder", type=click.Path(resolve_path=True))
+@click.option(
+    "--cpus", default=2, type=int, help="Number of CPUs used for loading data"
+)
 @click.option("--nz", default=10, type=int, help="Size of latent dimension.")
 @click.option(
     "--epochs", default=20, type=int, help="Number of epochs used for training."
@@ -30,14 +33,18 @@ def cli():
 @click.option(
     "--cuda/--no-cuda", default=True, help="Enable training on GPU using CUDA"
 )
-def train(cell_stack, output_folder, nz, epochs, log_interval, seed, batch_size, cuda):
+def train(
+    cell_stack, output_folder, cpus, nz, epochs, log_interval, seed, batch_size, cuda
+):
     """Train autoencoder network"""
     from asym.vae_train import train_vae
+
     all_tiles = np.load(cell_stack)
     train_vae(
         all_tiles,
         str(output_folder),
         nz=nz,
+        cpus=cpus,
         batch_size=batch_size,
         epochs=epochs,
         cuda=cuda,
@@ -53,6 +60,7 @@ def train(cell_stack, output_folder, nz, epochs, log_interval, seed, batch_size,
 def umap(encodings, metadata, save_path):
     """Compute UMAP embedding of cells"""
     from asym.run_umap import run_umap
+
     run_umap(encodings, metadata, save_path)
 
 
@@ -66,6 +74,7 @@ def vis(cell_stack, cell_data, port):
     from bokeh.application import Application
     from bokeh.application.handlers.function import FunctionHandler
     from bokeh.server.server import Server
+
     apps = {
         "/": Application(
             FunctionHandler(

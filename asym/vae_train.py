@@ -97,7 +97,15 @@ def loss_function(recon_x, x, mu, logvar):
 
 
 def train_vae(
-    all_tiles, outf, nz=8, batch_size=16, epochs=20, cuda=True, seed=1, log_interval=10
+    all_tiles,
+    outf,
+    nz=8,
+    cpus=2,
+    batch_size=16,
+    epochs=20,
+    cuda=True,
+    seed=1,
+    log_interval=10,
 ):
     cuda = cuda and torch.cuda.is_available()
 
@@ -105,22 +113,23 @@ def train_vae(
     if cuda:
         torch.cuda.manual_seed(seed)
 
-    print("Use CUDA:", cuda, "CUDA available:", torch.cuda.is_available())
-
-    kwargs = {"num_workers": 1, "pin_memory": True} if cuda else {}
+    print("Use CUDA:", cuda, "; CUDA available:", torch.cuda.is_available())
 
     vae_data = vae.VAEDataset(all_tiles)
 
-    train_loader = DataLoader(vae_data, batch_size=4, shuffle=True, num_workers=4)
+    train_loader = DataLoader(
+        vae_data, batch_size=batch_size, shuffle=True, num_workers=cpus
+    )
 
-    test_loader = DataLoader(vae_data, batch_size=4, shuffle=False, num_workers=4)
+    test_loader = DataLoader(
+        vae_data, batch_size=batch_size, shuffle=False, num_workers=cpus
+    )
 
     model = vae.VAE(image_channels=1, z_dim=nz)
     model.have_cuda = cuda
 
     if cuda:
         model.cuda()
-
 
     print(model)
 
@@ -172,7 +181,7 @@ def train_vae(
             if cuda:
                 data = data.cuda()
             recon_batch, z, mu, logvar = model(data)
-            encodings = encodings.append(pd.DataFrame(z.detach().numpy()))
+            encodings = encodings.append(pd.DataFrame(z.cpu().numpy()))
         return encodings
 
     for epoch in range(1, epochs + 1):
@@ -202,7 +211,9 @@ def train_vae(
     )
 
     torch.save(model, str(outf / "trained_model.pkl"))
-    encodings.to_csv(outf / (file_prefix + "_encodings.csv"), sep=",", index=False, header=False)
+    encodings.to_csv(
+        outf / (file_prefix + "_encodings.csv"), sep=",", index=False, header=False
+    )
     pd.DataFrame(umap_embed).to_csv(
         outf / (file_prefix + "umap_encodings.csv"), sep=",", header=False, index=False
     )
