@@ -74,14 +74,18 @@ def vis(cell_stack, cell_data, port):
     from bokeh.application import Application
     from bokeh.application.handlers.function import FunctionHandler
     from bokeh.server.server import Server
+    import pandas as pd
+
+    input_data = pd.read_csv(cell_data, index_col=False)
+    cell_stack = np.load(cell_stack)
 
     apps = {
         "/": Application(
             FunctionHandler(
                 partial(
                     prepare_server,
-                    cell_stack_file=cell_stack,
-                    input_data_file=cell_data,
+                    cell_stack=cell_stack,
+                    input_data=input_data,
                 )
             )
         )

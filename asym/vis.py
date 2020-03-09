@@ -6,15 +6,14 @@ import bokeh
 from bokeh.palettes import viridis, inferno
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, PreText, Select, ColorBar, RangeSlider
+from bokeh.models import ColumnDataSource, PreText, Select, ColorBar, RangeSlider, Div
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
 
+CELL_IMAGE_METRICS = {"mean": np.mean, "sd": np.std, "min": np.min, "max": np.max}
 
-def prepare_server(doc, input_data_file, cell_stack_file):
-    input_data = pd.read_csv(input_data_file, index_col=False)
-    cell_stack = np.load(cell_stack_file)
 
+def prepare_server(doc, input_data, cell_stack):
     @lru_cache()
     def get_data(m):
         d = input_data.copy()
@@ -27,10 +26,15 @@ def prepare_server(doc, input_data_file, cell_stack_file):
     marker_cols = list(sorted(input_data.select_dtypes(include=np.number).columns))
 
     stats = PreText(text="", width=200)
-    marker_select = Select(value=marker_cols[0], options=marker_cols)
+    marker_select = Select(value=marker_cols[0], options=marker_cols, title="Marker")
 
     marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))
+    metric_select = Select(
+        value="mean",
+        options=list(CELL_IMAGE_METRICS.keys()),
+        title="Image aggregation method",
+    )
 
     # set up plots
 
@@ -112,9 +116,12 @@ def prepare_server(doc, input_data_file, cell_stack_file):
         m = marker_select.value
         data = get_data(m)
         selected = source.selected.indices
-        if selected:
-            data = data.iloc[selected, :]
-        mean_image = np.mean(cell_stack[selected, :, :], axis=0)
+        if not selected:
+            return
+        data = data.iloc[selected, :]
+        mean_image = CELL_IMAGE_METRICS[metric_select.value](
+            cell_stack[selected, :, :], axis=0
+        )
         image_source.data = {
             "image": [mean_image],
             "dw": [cell_stack.shape[1]],
@@ -130,13 +137,14 @@ def prepare_server(doc, input_data_file, cell_stack_file):
     marker_select.on_change("value", marker_change)
     marker_slider.on_change("value", marker_slider_change)
     cell_slider.on_change("value", cell_slider_change)
+    metric_select.on_change("value", selection_change)
 
     # set up layout
-    widgets = column(marker_select, stats)
-    main_row = row(
-        column(umap_figure, marker_slider), widgets, column(cell_figure, cell_slider)
+    layout = row(
+        column(umap_figure, marker_slider),
+        column(marker_select, stats, metric_select),
+        column(cell_figure, cell_slider),
     )
-    layout = column(main_row)
 
     # initialize
     update()
