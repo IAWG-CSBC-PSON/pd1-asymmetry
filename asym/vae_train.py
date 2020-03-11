@@ -186,7 +186,7 @@ def train_vae(
             )
         )
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), str(outf / "vae_epoch_%d.pth" % epoch))
+            torch.save(model.state_dict(), str(outf / ("vae_epoch_%d.pth" % epoch)))
 
     def encode():
         model.eval()
