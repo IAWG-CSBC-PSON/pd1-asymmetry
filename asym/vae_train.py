@@ -3,6 +3,7 @@ import torch.utils.data
 from torch import nn, optim
 from torch.autograd import Variable
 from torch.nn import functional as F
+from scipy.ndimage import rotate
 
 # from torchvision import datasets, transforms
 from PIL import Image
@@ -93,7 +94,17 @@ def loss_function(recon_x, x, mu, logvar):
         recon_x.view(-1, x.shape[0]), x.reshape(-1, x.shape[0]), size_average=False
     )
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    return BCE + (0.2 * KLD)
+    return BCE + (0.1 * KLD)
+
+
+def rotate_cell(cell):
+    mr, mc = np.where(cell == np.amax(cell))  # find brightest point
+    cr, cc = (cell.shape[0] // 2, cell.shape[1] // 2)  # wrt center
+    theta = np.arctan2(mr - cr, mc - cc)[0]  # compute angle wrt center
+    ri = rotate(cell, angle=theta * (180 / np.pi))  # scipy.ndimage.rotate
+    sd = (ri.shape[0] - cell.shape[0]) // 2  # resize to original size
+    ri = ri[..., sd : (sd + cell.shape[0]), sd : (sd + cell.shape[0])]  # crop
+    return ri
 
 
 def train_vae(
@@ -106,6 +117,8 @@ def train_vae(
     cuda=True,
     seed=1,
     log_interval=10,
+    rotate=True,
+    normalize=True,
 ):
     cuda = cuda and torch.cuda.is_available()
 
@@ -115,7 +128,9 @@ def train_vae(
 
     print("Use CUDA:", cuda, "; CUDA available:", torch.cuda.is_available())
 
-    vae_data = vae.VAEDataset(all_tiles)
+    if rotate:
+        all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
+    vae_data = vae.VAEDataset(all_tiles, do_normalize=normalize)
 
     train_loader = DataLoader(
         vae_data, batch_size=batch_size, shuffle=True, num_workers=cpus
@@ -194,9 +209,10 @@ def train_vae(
     # make coord plot
     all_tiles = np.stack([i / i.max() for i in all_tiles])
     img, _ = MakeCoordPlot(
-        ((all_tiles * 2 ** 8).astype(np.uint8)),
+        (all_tiles * ((2 ** 8) - 1)).astype(np.uint8),
         pd.DataFrame(umap_embed),
         image_size=2000,
+        boarder_width=3,
     )
 
     file_prefix = (

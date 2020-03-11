@@ -7,7 +7,7 @@ import torch
 
 
 class VAEDataset(Dataset):
-    def __init__(self, data_file, transform=None):
+    def __init__(self, data_file, transform=None, do_normalize=True):
         """
         Args:
             data_file (string, np.array): Path to the npy file with images or numpy array.
@@ -19,11 +19,12 @@ class VAEDataset(Dataset):
             self.data = np.load(data_file)
         else:
             self.data = data_file
-        self.data = self.data[..., np.newaxis]
+        if do_normalize:
+            self.normalize()
+        self.data = self.data[..., np.newaxis]  # pytorch requirement
         self.data = np.moveaxis(self.data, 3, 1)
         self.data = torch.Tensor(self.data)
         self.transform = transform
-        self.normalize()
 
     def normalize(self):
         self.data = np.stack([(i - i.min()) / (i.max() - i.min()) for i in self.data])
@@ -64,6 +65,7 @@ class VAE(nn.Module):
             nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=2),
             nn.LeakyReLU(),
             Flatten(),
+            nn.Linear(409600, h_dim),
         )
 
         self.fc1 = nn.Linear(h_dim, z_dim)
@@ -105,10 +107,6 @@ class VAE(nn.Module):
 
     def forward(self, x):
         h = self.encoder(x)
-        ll = nn.Linear(h.shape[1], self.h_dim)
-        if self.have_cuda:
-            ll.cuda()
-        ei = ll(h)
-        z, mu, logvar = self.bottleneck(ei)
+        z, mu, logvar = self.bottleneck(h)
         di = self.fc3(z)
         return self.decoder(di), z, mu, logvar

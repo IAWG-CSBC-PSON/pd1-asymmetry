@@ -33,8 +33,28 @@ def cli():
 @click.option(
     "--cuda/--no-cuda", default=True, help="Enable training on GPU using CUDA"
 )
+@click.option(
+    "--normalize/--no-normalize",
+    default=True,
+    help="Normalize data to [0, 1] range before training",
+)
+@click.option(
+    "--rotate/--no-rotate",
+    default=True,
+    help="Rotate cells so that brightest point points up before training",
+)
 def train(
-    cell_stack, output_folder, cpus, nz, epochs, log_interval, seed, batch_size, cuda
+    cell_stack,
+    output_folder,
+    cpus,
+    nz,
+    epochs,
+    log_interval,
+    seed,
+    batch_size,
+    cuda,
+    normalize,
+    rotate,
 ):
     """Train autoencoder network"""
     from asym.vae_train import train_vae
@@ -50,6 +70,8 @@ def train(
         cuda=cuda,
         seed=seed,
         log_interval=log_interval,
+        normalize=normalize,
+        rotate=rotate,
     )
 
 
@@ -82,11 +104,7 @@ def vis(cell_stack, cell_data, port):
     apps = {
         "/": Application(
             FunctionHandler(
-                partial(
-                    prepare_server,
-                    cell_stack=cell_stack,
-                    input_data=input_data,
-                )
+                partial(prepare_server, cell_stack=cell_stack, input_data=input_data)
             )
         )
     }
