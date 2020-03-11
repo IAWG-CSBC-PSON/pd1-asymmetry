@@ -14,34 +14,54 @@ def cli():
 @click.argument("cell_stack", type=click.File("rb"))
 @click.argument("output_folder", type=click.Path(resolve_path=True))
 @click.option(
-    "--cpus", default=2, type=int, help="Number of CPUs used for loading data"
+    "--cpus",
+    default=2,
+    type=int,
+    help="Number of CPUs used for loading data",
+    show_default=True,
 )
-@click.option("--nz", default=10, type=int, help="Size of latent dimension.")
 @click.option(
-    "--epochs", default=20, type=int, help="Number of epochs used for training."
+    "--nz", default=10, type=int, help="Size of latent dimension.", show_default=True
+)
+@click.option(
+    "--epochs",
+    default=20,
+    type=int,
+    help="Number of epochs used for training.",
+    show_default=True,
 )
 @click.option(
     "--log-interval",
     default=10,
     type=int,
     help="how many batches to wait before logging training status",
+    show_default=True,
 )
-@click.option("--seed", default=1, type=int, help="Random seed")
+@click.option("--seed", default=1, type=int, help="Random seed", show_default=True)
 @click.option(
-    "--batch_size", default=16, type=int, help="Input batch size for training"
+    "--batch_size",
+    default=16,
+    type=int,
+    help="Input batch size for training",
+    show_default=True,
 )
 @click.option(
-    "--cuda/--no-cuda", default=True, help="Enable training on GPU using CUDA"
+    "--cuda/--no-cuda",
+    default=True,
+    help="Enable training on GPU using CUDA",
+    show_default=True,
 )
 @click.option(
     "--normalize/--no-normalize",
     default=True,
     help="Normalize data to [0, 1] range before training",
+    show_default=True,
 )
 @click.option(
     "--rotate/--no-rotate",
     default=True,
     help="Rotate cells so that brightest point points up before training",
+    show_default=True,
 )
 def train(
     cell_stack,
@@ -89,7 +109,7 @@ def umap(encodings, metadata, save_path):
 @cli.command()
 @click.argument("cell_stack", type=click.File("rb"))
 @click.argument("cell_data", type=click.File("r"))
-@click.option("--port", default=5000, help="Server port.")
+@click.option("--port", default=5000, help="Server port.", show_default=True)
 def vis(cell_stack, cell_data, port):
     """Visualize UMAP embedding of cells"""
     from asym.vis import prepare_server
