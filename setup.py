@@ -22,7 +22,7 @@ setuptools.setup(
         "bokeh",
         "torch",
         "matplotlib",
-        "umap",
+        "umap-learn",
     ],
     scripts=["bin/asym"],
 )
