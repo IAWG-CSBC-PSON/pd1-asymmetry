@@ -18,7 +18,7 @@ def cli():
     default=0,
     type=int,
     help="The index of the image channel used for training",
-    show_default=True
+    show_default=True,
 )
 @click.option(
     "--cpus",
@@ -70,6 +70,12 @@ def cli():
     help="Rotate cells so that brightest point points up before training",
     show_default=True,
 )
+@click.option(
+    "--augment/--no-augment",
+    default=True,
+    help="Augment input images by random rotations and reflections during training",
+    show_default=True,
+)
 def train(
     cell_stack,
     output_folder,
@@ -83,6 +89,7 @@ def train(
     cuda,
     normalize,
     rotate,
+    augment,
 ):
     """Train autoencoder network
 
@@ -106,6 +113,7 @@ def train(
         log_interval=log_interval,
         normalize=normalize,
         rotate=rotate,
+        augment=augment,
     )
 
 

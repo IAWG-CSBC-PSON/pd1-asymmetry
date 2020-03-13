@@ -107,6 +107,14 @@ def rotate_cell(cell):
     return ri
 
 
+def random_transform(data):
+    data = rotate(data, angle=np.random.randint(0, 360), axes=(1, 2), reshape=False)
+    if np.random.random() > 0.5:
+        # Remove negative stride with copy
+        data = np.flip(data, axis=1).copy()
+    return data
+
+
 def train_vae(
     all_tiles,
     outf,
@@ -120,6 +128,7 @@ def train_vae(
     log_interval=10,
     rotate=True,
     normalize=True,
+    augment=True,
 ):
     cuda = cuda and torch.cuda.is_available()
 
@@ -132,7 +141,11 @@ def train_vae(
     all_tiles = all_tiles[:, image_channel, :, :]
     if rotate:
         all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
-    vae_data = vae.VAEDataset(all_tiles, do_normalize=normalize)
+    vae_data = vae.VAEDataset(
+        all_tiles,
+        do_normalize=normalize,
+        transform=random_transform if augment else None,
+    )
 
     train_loader = DataLoader(
         vae_data, batch_size=batch_size, shuffle=True, num_workers=cpus

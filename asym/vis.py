@@ -1,4 +1,5 @@
 from functools import lru_cache
+from operator import itemgetter
 import pandas as pd
 import numpy as np
 
@@ -26,7 +27,12 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         if cell_markers is not None
         else [f"Marker {i + 1}" for i in range(cell_stack.shape[1])]
     )
-    cell_markers = [(str(i), x) for i, x in enumerate(cell_markers)]
+    cell_markers = list(
+        (str(j), y)
+        for j, y in sorted(
+            ((i, x) for i, x in enumerate(cell_markers)), key=itemgetter(1)
+        )
+    )
 
     # set up widgets
 
@@ -132,7 +138,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
             return
         data = data.iloc[selected, :]
         mean_image = CELL_IMAGE_METRICS[metric_select.value](
-            cell_stack[selected, cell_markers_select.value, :, :], axis=0
+            cell_stack[selected, int(cell_markers_select.value), :, :], axis=0
         )
         image_source.data = {
             "image": [mean_image],
@@ -155,8 +161,8 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     # set up layout
     layout = row(
         column(umap_figure, marker_slider),
-        column(marker_select, stats, metric_select),
-        column(cell_markers_select, cell_figure, cell_slider),
+        column(marker_select, stats),
+        column(cell_markers_select, metric_select, cell_figure, cell_slider),
     )
 
     # initialize
