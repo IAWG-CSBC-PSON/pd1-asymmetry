@@ -110,6 +110,7 @@ def rotate_cell(cell):
 def train_vae(
     all_tiles,
     outf,
+    image_channel=0,
     nz=8,
     cpus=2,
     batch_size=16,
@@ -128,6 +129,7 @@ def train_vae(
 
     print("Use CUDA:", cuda, "; CUDA available:", torch.cuda.is_available())
 
+    all_tiles = all_tiles[:, image_channel, :, :]
     if rotate:
         all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
     vae_data = vae.VAEDataset(all_tiles, do_normalize=normalize)

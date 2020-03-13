@@ -14,6 +14,13 @@ def cli():
 @click.argument("cell_stack", type=click.File("rb"))
 @click.argument("output_folder", type=click.Path(resolve_path=True))
 @click.option(
+    "--image-channel",
+    default=0,
+    type=int,
+    help="The index of the image channel used for training",
+    show_default=True
+)
+@click.option(
     "--cpus",
     default=2,
     type=int,
@@ -39,7 +46,7 @@ def cli():
 )
 @click.option("--seed", default=1, type=int, help="Random seed", show_default=True)
 @click.option(
-    "--batch_size",
+    "--batch-size",
     default=16,
     type=int,
     help="Input batch size for training",
@@ -66,6 +73,7 @@ def cli():
 def train(
     cell_stack,
     output_folder,
+    image_channel,
     cpus,
     nz,
     epochs,
@@ -76,7 +84,13 @@ def train(
     normalize,
     rotate,
 ):
-    """Train autoencoder network"""
+    """Train autoencoder network
+
+    Expected input is a numpy array in the shape (n_cells, n_image_channels, x, y)
+    and a path to an output folder where results will be stored.
+
+    Training only uses the selected image channel, all other channels are ignored.
+    """
     from asym.vae_train import train_vae
 
     all_tiles = np.load(cell_stack)
@@ -109,8 +123,14 @@ def umap(encodings, metadata, save_path):
 @cli.command()
 @click.argument("cell_stack", type=click.File("rb"))
 @click.argument("cell_data", type=click.File("r"))
+@click.option(
+    "--markers",
+    type=click.File("r"),
+    default=None,
+    help="Path to file with marker names for cell stack, one per line.",
+)
 @click.option("--port", default=5000, help="Server port.", show_default=True)
-def vis(cell_stack, cell_data, port):
+def vis(cell_stack, cell_data, markers, port):
     """Visualize UMAP embedding of cells"""
     from asym.vis import prepare_server
     from bokeh.application import Application
@@ -120,11 +140,18 @@ def vis(cell_stack, cell_data, port):
 
     input_data = pd.read_csv(cell_data, index_col=False)
     cell_stack = np.load(cell_stack)
+    if markers is not None:
+        markers = [l.strip() for l in markers.readlines()]
 
     apps = {
         "/": Application(
             FunctionHandler(
-                partial(prepare_server, cell_stack=cell_stack, input_data=input_data)
+                partial(
+                    prepare_server,
+                    cell_stack=cell_stack,
+                    input_data=input_data,
+                    cell_markers=markers,
+                )
             )
         )
     }

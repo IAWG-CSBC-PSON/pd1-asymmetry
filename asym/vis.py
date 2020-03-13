@@ -13,7 +13,7 @@ from bokeh.transform import linear_cmap
 CELL_IMAGE_METRICS = {"mean": np.mean, "sd": np.std, "min": np.min, "max": np.max}
 
 
-def prepare_server(doc, input_data, cell_stack):
+def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     @lru_cache()
     def get_data(m):
         d = input_data.copy()
@@ -21,13 +21,25 @@ def prepare_server(doc, input_data, cell_stack):
             d["marker_val"] = d[m]
         return d
 
+    cell_markers = (
+        cell_markers
+        if cell_markers is not None
+        else [f"Marker {i + 1}" for i in range(cell_stack.shape[1])]
+    )
+    cell_markers = [(str(i), x) for i, x in enumerate(cell_markers)]
+
     # set up widgets
 
     marker_cols = list(sorted(input_data.select_dtypes(include=np.number).columns))
 
     stats = PreText(text="", width=200)
-    marker_select = Select(value=marker_cols[0], options=marker_cols, title="Marker")
+    marker_select = Select(
+        value=marker_cols[0], options=marker_cols, title="Color UMAP by"
+    )
 
+    cell_markers_select = Select(
+        value=cell_markers[0][0], options=cell_markers, title="Marker cell image"
+    )
     marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))
     metric_select = Select(
@@ -120,7 +132,7 @@ def prepare_server(doc, input_data, cell_stack):
             return
         data = data.iloc[selected, :]
         mean_image = CELL_IMAGE_METRICS[metric_select.value](
-            cell_stack[selected, :, :], axis=0
+            cell_stack[selected, cell_markers_select.value, :, :], axis=0
         )
         image_source.data = {
             "image": [mean_image],
@@ -138,12 +150,13 @@ def prepare_server(doc, input_data, cell_stack):
     marker_slider.on_change("value", marker_slider_change)
     cell_slider.on_change("value", cell_slider_change)
     metric_select.on_change("value", selection_change)
+    cell_markers_select.on_change("value", selection_change)
 
     # set up layout
     layout = row(
         column(umap_figure, marker_slider),
         column(marker_select, stats, metric_select),
-        column(cell_figure, cell_slider),
+        column(cell_markers_select, cell_figure, cell_slider),
     )
 
     # initialize
