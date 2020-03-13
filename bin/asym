@@ -76,6 +76,11 @@ def cli():
     help="Augment input images by random rotations and reflections during training",
     show_default=True,
 )
+@click.option(
+    "--model-instance",
+    type=click.File("rb"),
+    help="Path to pickle file containing pre-made model instance",
+)
 def train(
     cell_stack,
     output_folder,
@@ -90,6 +95,7 @@ def train(
     normalize,
     rotate,
     augment,
+    model_instance=None,
 ):
     """Train autoencoder network
 
@@ -99,8 +105,12 @@ def train(
     Training only uses the selected image channel, all other channels are ignored.
     """
     from asym.vae_train import train_vae
+    import pickle
 
+    if model_instance is not None:
+        model_instance = pickle.load(model_instance)
     all_tiles = np.load(cell_stack)
+
     train_vae(
         all_tiles,
         str(output_folder),
@@ -114,6 +124,7 @@ def train(
         normalize=normalize,
         rotate=rotate,
         augment=augment,
+        model_instance=model_instance,
     )
 
 

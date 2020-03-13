@@ -115,6 +115,18 @@ def random_transform(data):
     return data
 
 
+def encode(model, data_loader):
+    model.eval()
+    encodings = pd.DataFrame()
+    for batch_idx, data in enumerate(data_loader):
+        data = Variable(data)
+        if getattr(model, "have_cuda", False):
+            data = data.cuda()
+        recon_batch, z, mu, logvar = model(data)
+        encodings = encodings.append(pd.DataFrame(z.cpu().detach().numpy()))
+    return encodings
+
+
 def train_vae(
     all_tiles,
     outf,
@@ -129,6 +141,7 @@ def train_vae(
     rotate=True,
     normalize=True,
     augment=True,
+    model_instance=None,
 ):
     cuda = cuda and torch.cuda.is_available()
 
@@ -155,7 +168,11 @@ def train_vae(
         vae_data, batch_size=batch_size, shuffle=False, num_workers=cpus
     )
 
-    model = vae.VAE(image_channels=1, z_dim=nz)
+    model = (
+        vae.VAE(image_channels=1, z_dim=nz)
+        if model_instance is None
+        else model_instance
+    )
     model.have_cuda = cuda
 
     if cuda:
@@ -200,24 +217,16 @@ def train_vae(
                 epoch, train_loss / len(train_loader.dataset)
             )
         )
-        if epoch % 10 == 0:
-            torch.save(model.state_dict(), str(outf / ("vae_epoch_%d.pth" % epoch)))
-
-    def encode():
-        model.eval()
-        encodings = pd.DataFrame()
-        for batch_idx, data in enumerate(test_loader):
-            data = Variable(data)
-            if cuda:
-                data = data.cuda()
-            recon_batch, z, mu, logvar = model(data)
-            encodings = encodings.append(pd.DataFrame(z.cpu().detach().numpy()))
-        return encodings
 
     for epoch in range(1, epochs + 1):
-        train(epoch)
+        try:
+            train(epoch)
+        except KeyboardInterrupt:
+            print("Interrupted, saving model state...")
+            torch.save(model, str(outf / ("trained_model_epoch_%d.pkl" % epoch)))
+            raise
 
-    encodings = encode()
+    encodings = encode(model, test_loader)
 
     umap_embed = umap.UMAP().fit_transform(encodings)
 
