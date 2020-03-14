@@ -15,6 +15,7 @@ import json
 import datetime
 import os
 from pathlib import Path
+from operator import itemgetter
 from . import vae
 
 
@@ -127,6 +128,18 @@ def encode(model, data_loader):
     return encodings
 
 
+def decode(model, data_loader):
+    model.eval()
+    decodings = []
+    for batch_idx, data in enumerate(data_loader):
+        data = Variable(data)
+        if getattr(model, "have_cuda", False):
+            data = data.cuda()
+        dec = model.decoder(model.fc3(data))
+        decodings.append(dec.cpu().detach().numpy())
+    return np.concatenate(decodings)
+
+
 def train_vae(
     all_tiles,
     outf,
@@ -143,6 +156,11 @@ def train_vae(
     augment=True,
     model_instance=None,
 ):
+    params = "_".join(
+        f"{k}_{v}"
+        for k, v in sorted(locals().items(), key=itemgetter(0))
+        if k not in ["all_tiles", "outf", "model_instance"]
+    )
     cuda = cuda and torch.cuda.is_available()
 
     torch.manual_seed(seed)
@@ -151,21 +169,27 @@ def train_vae(
 
     print("Use CUDA:", cuda, "; CUDA available:", torch.cuda.is_available())
 
-    all_tiles = all_tiles[:, image_channel, :, :]
+    if image_channel is not None:
+        all_tiles = all_tiles[:, image_channel, :, :]
     if rotate:
         all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
-    vae_data = vae.VAEDataset(
-        all_tiles,
-        do_normalize=normalize,
-        transform=random_transform if augment else None,
-    )
 
     train_loader = DataLoader(
-        vae_data, batch_size=batch_size, shuffle=True, num_workers=cpus
+        vae.VAEDataset(
+            all_tiles,
+            do_normalize=normalize,
+            transform=random_transform if augment else None,
+        ),
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=cpus,
     )
 
     test_loader = DataLoader(
-        vae_data, batch_size=batch_size, shuffle=False, num_workers=cpus
+        vae.VAEDataset(all_tiles, do_normalize=normalize, transform=None),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=cpus,
     )
 
     model = (
@@ -223,7 +247,14 @@ def train_vae(
             train(epoch)
         except KeyboardInterrupt:
             print("Interrupted, saving model state...")
-            torch.save(model, str(outf / ("trained_model_epoch_%d.pkl" % epoch)))
+            torch.save(model, str(outf / f"trained_model_epoch_{epoch}.pkl"))
+            encodings = encode(model, test_loader)
+            encodings.to_csv(
+                outf / f"encodings_epoch_{epoch}.csv",
+                sep=",",
+                index=False,
+                header=False,
+            )
             raise
 
     encodings = encode(model, test_loader)
@@ -239,22 +270,11 @@ def train_vae(
         boarder_width=3,
     )
 
-    file_prefix = (
-        "batchsize_"
-        + str(batch_size)
-        + "-"
-        + "epochs_"
-        + str(epochs)
-        + "-"
-        + "latentdim_"
-        + str(nz)
-    )
-
     torch.save(model, str(outf / "trained_model.pkl"))
     encodings.to_csv(
-        outf / (file_prefix + "_encodings.csv"), sep=",", index=False, header=False
+        outf / (params + "_encodings.csv"), sep=",", index=False, header=False
     )
     pd.DataFrame(umap_embed).to_csv(
-        outf / (file_prefix + "umap_encodings.csv"), sep=",", header=False, index=False
+        outf / (params + "umap_encodings.csv"), sep=",", header=False, index=False
     )
-    img.save(outf / (file_prefix + "umap_projection.png"))
+    img.save(outf / (params + "umap_projection.png"))

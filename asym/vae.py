@@ -47,8 +47,13 @@ class Flatten(nn.Module):
 
 
 class UnFlatten(nn.Module):
+    def __init__(self, *args, **kwargs):
+        self.image_size = kwargs.pop("image_size", 1)
+        super().__init__(*args, **kwargs)
+
     def forward(self, input, size=1024):
-        return input.view(input.size(0), size, 1, 1)
+        s = input.size()
+        return input.view(s[0], s[1] // (self.image_size**2), self.image_size, self.image_size)
 
 
 class VAE(nn.Module):
