@@ -55,6 +55,13 @@ def cli():
     show_default=True,
 )
 @click.option(
+    "--learning-rate",
+    default=5e-4,
+    type=float,
+    help="Learning rate for training",
+    show_default=True,
+)
+@click.option(
     "--cuda/--no-cuda",
     default=True,
     help="Enable training on GPU using CUDA",
@@ -93,6 +100,7 @@ def train(
     log_interval,
     seed,
     batch_size,
+    learning_rate,
     cuda,
     normalize,
     rotate,
@@ -107,10 +115,10 @@ def train(
     Training only uses the selected image channel, all other channels are ignored.
     """
     from asym.vae_train import train_vae
-    import pickle
+    import torch
 
     if model_instance is not None:
-        model_instance = pickle.load(model_instance)
+        model_instance = torch.load(model_instance)
     all_tiles = np.load(cell_stack)
 
     train_vae(
@@ -119,6 +127,7 @@ def train(
         nz=nz,
         cpus=cpus,
         batch_size=batch_size,
+        learning_rate=learning_rate,
         epochs=epochs,
         cuda=cuda,
         seed=seed,

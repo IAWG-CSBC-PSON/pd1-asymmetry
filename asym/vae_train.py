@@ -151,16 +151,17 @@ def train_vae(
     cuda=True,
     seed=1,
     log_interval=10,
+    learning_rate=5e-4,
     rotate=True,
     normalize=True,
     augment=True,
     model_instance=None,
 ):
-    params = "_".join(
-        f"{k}_{v}"
+    params = {
+        k: v
         for k, v in sorted(locals().items(), key=itemgetter(0))
         if k not in ["all_tiles", "outf", "model_instance"]
-    )
+    }
     cuda = cuda and torch.cuda.is_available()
 
     torch.manual_seed(seed)
@@ -204,7 +205,7 @@ def train_vae(
 
     print(model)
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     outf = Path(outf + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
     if not outf.exists():
@@ -212,6 +213,9 @@ def train_vae(
 
     with open(outf / "model.txt", "w") as f1:
         print(model, file=f1)
+
+    with open(outf / "params.txt", "w") as f1:
+        print("\n".join(f"{k}: {v}" for k, v in params.items()), file=f1)
 
     def train(epoch):
         model.train()
@@ -272,9 +276,9 @@ def train_vae(
 
     torch.save(model, str(outf / "trained_model.pkl"))
     encodings.to_csv(
-        outf / (params + "_encodings.csv"), sep=",", index=False, header=False
+        outf / "encodings.csv", sep=",", index=False, header=False
     )
     pd.DataFrame(umap_embed).to_csv(
-        outf / (params + "umap_encodings.csv"), sep=",", header=False, index=False
+        outf / "umap_encodings.csv", sep=",", header=False, index=False
     )
-    img.save(outf / (params + "umap_projection.png"))
+    img.save(outf / "umap_projection.png")
