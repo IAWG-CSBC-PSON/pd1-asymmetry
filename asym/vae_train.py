@@ -206,7 +206,7 @@ def train_vae(
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
-    outf = Path(outf + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%H:%M:%S"))
+    outf = Path(outf + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     if not outf.exists():
         outf.mkdir()
 

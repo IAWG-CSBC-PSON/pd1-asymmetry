@@ -99,8 +99,6 @@ class VAE(nn.Module):
             esp = esp.cuda()
             mu.cuda()
             logvar.cuda()
-        # import ipdb
-        # ipdb.set_trace()
         z = mu + std * esp
         return z
 
