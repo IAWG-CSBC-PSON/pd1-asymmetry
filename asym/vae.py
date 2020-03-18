@@ -53,7 +53,9 @@ class UnFlatten(nn.Module):
 
     def forward(self, input, size=1024):
         s = input.size()
-        return input.view(s[0], s[1] // (self.image_size**2), self.image_size, self.image_size)
+        return input.view(
+            s[0], s[1] // (self.image_size ** 2), self.image_size, self.image_size
+        )
 
 
 class VAE(nn.Module):

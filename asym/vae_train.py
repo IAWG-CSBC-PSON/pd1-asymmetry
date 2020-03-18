@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import umap
 import pandas as pd
 import numpy as np
+import copy
 import json
 import datetime
 import os
@@ -175,22 +176,20 @@ def train_vae(
     if rotate:
         all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
 
+    train_dataset = vae.VAEDataset(
+        all_tiles,
+        do_normalize=normalize,
+        transform=random_transform if augment else None,
+    )
+    test_dataset = copy.copy(train_dataset)
+    test_dataset.transform = None
+
     train_loader = DataLoader(
-        vae.VAEDataset(
-            all_tiles,
-            do_normalize=normalize,
-            transform=random_transform if augment else None,
-        ),
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=cpus,
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=cpus
     )
 
     test_loader = DataLoader(
-        vae.VAEDataset(all_tiles, do_normalize=normalize, transform=None),
-        batch_size=batch_size,
-        shuffle=False,
-        num_workers=cpus,
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=cpus
     )
 
     model = (
@@ -275,10 +274,8 @@ def train_vae(
     )
 
     torch.save(model, str(outf / "trained_model.pkl"))
-    encodings.to_csv(
-        outf / "encodings.csv", sep=",", index=False, header=False
-    )
+    encodings.to_csv(outf / "encodings.csv", index=False, header=False)
     pd.DataFrame(umap_embed).to_csv(
-        outf / "umap_encodings.csv", sep=",", header=False, index=False
+        outf / "umap_encodings.csv", header=False, index=False
     )
     img.save(outf / "umap_projection.png")
