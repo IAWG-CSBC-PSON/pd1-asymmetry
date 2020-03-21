@@ -7,11 +7,19 @@ import bokeh
 from bokeh.palettes import viridis, inferno
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, PreText, Select, ColorBar, RangeSlider, Div
+from bokeh.models import (
+    ColumnDataSource,
+    PreText,
+    Select,
+    ColorBar,
+    RangeSlider,
+    Div,
+    RadioButtonGroup,
+)
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap
 
-CELL_IMAGE_METRICS = {"mean": np.mean, "sd": np.std, "min": np.min, "max": np.max}
+CELL_IMAGE_METRICS = (["mean", "sd", "min", "max"], [np.mean, np.std, np.min, np.max])
 
 
 def prepare_server(doc, input_data, cell_stack, cell_markers=None):
@@ -38,7 +46,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
 
     marker_cols = list(sorted(input_data.select_dtypes(include=np.number).columns))
 
-    stats = PreText(text="", width=200)
+    stats = PreText(text="", width=100)
     marker_select = Select(
         value=marker_cols[0], options=marker_cols, title="Color UMAP by"
     )
@@ -48,11 +56,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     )
     marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))
-    metric_select = Select(
-        value="mean",
-        options=list(CELL_IMAGE_METRICS.keys()),
-        title="Image aggregation method",
-    )
+    metric_select = RadioButtonGroup(active=0, labels=CELL_IMAGE_METRICS[0])
 
     # set up plots
 
@@ -61,7 +65,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
 
     marker_mapper = linear_cmap(
         field_name="marker_val",
-        palette=inferno(8)[:-1],
+        palette=inferno(10)[:-1],
         low=0,
         high=500,
         high_color=None,
@@ -75,7 +79,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     umap_figure.circle(
         "d1",
         "d2",
-        size=4,
+        size=5,
         source=source,
         line_color=marker_mapper,
         color=marker_mapper,
@@ -85,14 +89,14 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         selection_alpha=0.8,
     )
     umap_color_bar = ColorBar(
-        color_mapper=marker_mapper["transform"], width=8, location=(0, 0)
+        color_mapper=marker_mapper["transform"], width=12, location=(0, 0)
     )
     umap_figure.add_layout(umap_color_bar, "right")
 
     cell_mapper = bokeh.models.mappers.LinearColorMapper(
-        viridis(10), low=0, high=1000, high_color=None
+        viridis(100), low=0, high=1000, high_color=None
     )
-    cell_color_bar = ColorBar(color_mapper=cell_mapper, width=8, location=(0, 0))
+    cell_color_bar = ColorBar(color_mapper=cell_mapper, width=12, location=(0, 0))
     cell_figure = figure(plot_width=450, plot_height=350, tools="pan,wheel_zoom,reset")
     cell_image = cell_figure.image(
         image="image",
@@ -128,7 +132,6 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         marker_slider.start = marker_min
         marker_slider.end = marker_max
         marker_slider.value = tuple(np.percentile(d["marker_val"], [5, 95]))
-        umap_figure.title.text = "UMAP with marker %s" % (m)
 
     def selection_change(attrname, old, new):
         m = marker_select.value
@@ -137,7 +140,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         if not selected:
             return
         data = data.iloc[selected, :]
-        mean_image = CELL_IMAGE_METRICS[metric_select.value](
+        mean_image = CELL_IMAGE_METRICS[1][metric_select.active](
             cell_stack[selected, int(cell_markers_select.value), :, :], axis=0
         )
         image_source.data = {
@@ -155,14 +158,13 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     marker_select.on_change("value", marker_change)
     marker_slider.on_change("value", marker_slider_change)
     cell_slider.on_change("value", cell_slider_change)
-    metric_select.on_change("value", selection_change)
+    metric_select.on_change("active", selection_change)
     cell_markers_select.on_change("value", selection_change)
 
     # set up layout
     layout = row(
-        column(umap_figure, marker_slider),
-        column(marker_select, stats),
-        column(cell_markers_select, metric_select, cell_figure, cell_slider),
+        column(marker_select, umap_figure, marker_slider),
+        column(cell_markers_select, metric_select, cell_figure, stats, cell_slider),
     )
 
     # initialize
