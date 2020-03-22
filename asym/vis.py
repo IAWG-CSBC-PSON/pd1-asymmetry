@@ -8,16 +8,16 @@ from bokeh.palettes import viridis, inferno, Set3
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
 from bokeh.models import (
+    AutocompleteInput,
+    Button,
+    Circle,
+    ColorBar,
     ColumnDataSource,
     PreText,
-    Select,
-    ColorBar,
-    RangeSlider,
-    Div,
     RadioButtonGroup,
+    RangeSlider,
+    Select,
     TextInput,
-    Button,
-    Panel,
 )
 from bokeh.plotting import figure
 from bokeh.transform import linear_cmap, factor_cmap
@@ -45,14 +45,101 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     def get_cat_colors(n):
         return Set3[max(3, n)][:n]
 
-    # @lru_cache()
-    # def make_colormapper(levels):
-    #     mapper = factor_cmap("", Set3[max(3, len(levels))][:len(levels)], levels)
-    #     # colorbar = ColorBar(color_mapper=mapper["transform"], width=12, location=(0, 0))
-    #     return mapper["transform"]
+    @lru_cache()
+    def marker_cols(lower=False):
+        markers = list(sorted(input_data.columns))
+        if lower:
+            return {x.lower(): x for x in markers}
+        return markers
 
-    def get_markers():
-        return tuple(sorted(input_data.columns))
+    # Marker selection for UMAP plots
+    ###########################################################################
+
+    marker_select = Select(
+        value=marker_cols()[0], options=marker_cols(), title="Color UMAP by"
+    )
+    marker_input = AutocompleteInput(
+        completions=marker_cols() + list(marker_cols(lower=True).keys()),
+        min_characters=1,
+        placeholder="Search for marker",
+    )
+    marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
+
+    # Data sources
+    ###########################################################################
+
+    source = ColumnDataSource(data=get_data(None))
+    image_source = ColumnDataSource(data=dict(image=[], dw=[], dh=[]))
+
+    # UMAP scatter plot for numeric data
+    ###########################################################################
+
+    umap_figure = figure(
+        plot_width=800,
+        plot_height=500,
+        tools="pan,wheel_zoom,lasso_select,box_select,tap,reset",
+        active_scroll="wheel_zoom",
+        active_drag="box_select",
+        active_tap="tap",
+    )
+    marker_mapper = linear_cmap(
+        field_name="marker_val_num",
+        palette=inferno(10)[:-1],
+        low=0,
+        high=500,
+        high_color=None,
+    )
+    umap_figure.circle(
+        "d1",
+        "d2",
+        size=8,
+        source=source,
+        alpha=0.5,
+        fill_color=marker_mapper,
+        line_color=None,
+        selection_alpha=0.8,
+        selection_line_color="black",
+        nonselection_alpha=0.2,
+    )
+    umap_color_bar = ColorBar(
+        color_mapper=marker_mapper["transform"], width=12, location=(0, 0)
+    )
+    umap_figure.add_layout(umap_color_bar, "right")
+
+    # UMAP scatter plot for categorical data
+    ###########################################################################
+
+    umap_figure_cat = figure(
+        plot_width=800,
+        plot_height=500,
+        tools="pan,wheel_zoom,lasso_select,box_select,tap,reset",
+        active_scroll="wheel_zoom",
+        active_drag="box_select",
+        active_tap="tap",
+        x_range=umap_figure.x_range,
+        y_range=umap_figure.y_range,
+    )
+    marker_mapper_cat = factor_cmap(
+        field_name="marker_val_cat", palette=["#000000"], factors=["a"]
+    )
+    umap_figure_cat.circle(
+        "d1",
+        "d2",
+        size=8,
+        source=source,
+        legend_field="marker_val_cat",
+        alpha=0.5,
+        fill_color=marker_mapper_cat,
+        line_color=None,
+        selection_alpha=0.8,
+        selection_line_color="black",
+        nonselection_alpha=0.2,
+    )
+    umap_figure_cat.legend.location = "center_right"
+    umap_figure_cat.legend.orientation = "vertical"
+
+    # Cell picture plot
+    ###########################################################################
 
     cell_markers = (
         cell_markers
@@ -66,88 +153,12 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         )
     )
 
-    # set up widgets
-
-    marker_cols = get_markers()
-
-    stats = PreText(text="", width=100)
-    marker_select = Select(
-        value=marker_cols[0], options=list(marker_cols), title="Color UMAP by"
-    )
-
     cell_markers_select = Select(
         value=cell_markers[0][0], options=cell_markers, title="Marker cell image"
     )
-    marker_slider = RangeSlider(start=0, end=1, value=(0, 1), step=0.1)
     cell_slider = RangeSlider(start=0, end=1, value=(0, 1))
     metric_select = RadioButtonGroup(active=0, labels=CELL_IMAGE_METRICS[0])
-
-    # set up plots
-
-    source = ColumnDataSource(data=get_data(None))
-    image_source = ColumnDataSource(data=dict(image=[], dw=[], dh=[]))
-
-    marker_mapper = linear_cmap(
-        field_name="marker_val_num",
-        palette=inferno(10)[:-1],
-        low=0,
-        high=500,
-        high_color=None,
-    )
-
-    umap_figure = figure(
-        plot_width=800,
-        plot_height=500,
-        tools="pan,wheel_zoom,lasso_select,box_select,tap,reset",
-        active_scroll="wheel_zoom",
-        active_drag="box_select",
-        active_tap="tap",
-    )
-    umap_figure.circle(
-        "d1",
-        "d2",
-        size=5,
-        source=source,
-        line_color=marker_mapper,
-        color=marker_mapper,
-        selection_color="orange",
-        alpha=0.6,
-        nonselection_alpha=0.4,
-        selection_alpha=0.8,
-    )
-    umap_color_bar = ColorBar(
-        color_mapper=marker_mapper["transform"], width=12, location=(0, 0)
-    )
-    umap_figure.add_layout(umap_color_bar, "right")
-
-    umap_figure_cat = figure(
-        plot_width=800,
-        plot_height=500,
-        tools="pan,wheel_zoom,lasso_select,box_select,tap,reset",
-        active_scroll="wheel_zoom",
-        active_drag="box_select",
-        active_tap="tap",
-        # x_range=umap_figure.x_range,
-        # y_range=umap_figure.y_range,
-    )
-    marker_mapper_cat = factor_cmap(
-        field_name="marker_val_cat", palette=["#000000"], factors=["a"]
-    )
-    umap_figure_cat.circle(
-        "d1",
-        "d2",
-        size=5,
-        source=source,
-        line_color=marker_mapper_cat,
-        color=marker_mapper_cat,
-        legend_field="marker_val_cat",
-        selection_color="orange",
-        alpha=0.6,
-        nonselection_alpha=0.4,
-        selection_alpha=0.8,
-    )
-    umap_figure_cat.legend.location = "center_right"
-    umap_figure_cat.legend.orientation = "vertical"
+    stats = PreText(text="", width=100)
 
     cell_mapper = bokeh.models.mappers.LinearColorMapper(
         viridis(20), low=0, high=1000, high_color=None
@@ -165,14 +176,20 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     )
     cell_figure.add_layout(cell_color_bar, "right")
 
+    # Edit data of selected cells
+    ###########################################################################
+
     edit_selection_col = TextInput(title="Column")
     edit_selection_val = TextInput(title="Value")
-    edit_selection_submit = Button(label="Submit", button_type="primary")
+    edit_selection_submit = Button(
+        label="Submit", button_type="primary", align=("start", "end")
+    )
+    edit_selecton_log = PreText(text="")
 
-    # set up callbacks
+    # Callbacks for buttons and widgets
+    ###########################################################################
 
     def marker_change(attrname, old, new):
-        # marker_select.options = nix(new, marker_cols)
         update()
 
     def cell_slider_change(attrname, old, new):
@@ -190,21 +207,17 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         numeric_marker = np.issubdtype(d[m].dtype, np.number)
         if not numeric_marker:
             levels = list(sorted(set(d["marker_val_cat"])))
-            # Remove old colorbar
-            # if len(umap_figure_cat.right) > 0:
-            # umap_figure_cat.right.pop()
-            # mapper = make_colormapper(levels)
-            # umap_figure_cat.add_layout(colorbar, "right")
             marker_mapper_cat["transform"].palette = get_cat_colors(len(levels))
             marker_mapper_cat["transform"].factors = levels
-        umap_figure.visible = numeric_marker
-        umap_figure_cat.visible = not numeric_marker
-        if update_range and numeric_marker:
+        elif update_range and numeric_marker:
             marker_max = d["marker_val_num"].max()
             marker_min = d["marker_val_num"].min()
             marker_slider.start = marker_min
             marker_slider.end = marker_max
             marker_slider.value = tuple(np.percentile(d["marker_val_num"], [5, 95]))
+        umap_figure.visible = numeric_marker
+        umap_figure_cat.visible = not numeric_marker
+        marker_slider.visible = numeric_marker
 
     def selection_change(attrname, old, new):
         m = marker_select.value
@@ -230,17 +243,31 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     def mark_selection():
         get_data.cache_clear()
         col = edit_selection_col.value
+        if col is None or col == "":
+            return
         if col not in input_data:
-            input_data[col] = np.full(input_data.shape[0], "")
+            input_data[col] = np.full(input_data.shape[0], "NA")
         input_data.loc[
             input_data.index[source.selected.indices], col
         ] = edit_selection_val.value
+        edit_selecton_log.text += f'Edited {len(source.selected.indices)} cells. {col}="{edit_selection_val.value}"\n'
         update(update_range=False)
-        new_marker_cols = tuple(sorted(input_data.columns))
-        nonlocal marker_cols
-        if new_marker_cols != marker_cols:
-            marker_cols = new_marker_cols
-            marker_select.options = list(marker_cols)
+        old_marker_cols = set(marker_cols())
+        marker_cols.cache_clear()
+        if old_marker_cols != set(marker_cols()):
+            marker_select.options = marker_cols()
+            marker_input.completions = marker_cols() + list(
+                marker_cols(lower=True).keys()
+            )
+
+    def autocomplete_change(attrname, old, new):
+        if new not in marker_cols():
+            try:
+                new = marker_cols(lower=True)[new]
+            except KeyError:
+                return
+        marker_select.value = new
+        marker_input.value = None
 
     source.selected.on_change("indices", selection_change)
     marker_select.on_change("value", marker_change)
@@ -249,17 +276,18 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     metric_select.on_change("active", selection_change)
     cell_markers_select.on_change("value", selection_change)
     edit_selection_submit.on_click(mark_selection)
+    marker_input.on_change("value", autocomplete_change)
 
     # set up layout
     layout = row(
         column(
             marker_select,
-            # row(umap_figure, umap_figure_cat),
+            marker_input,
             umap_figure,
             umap_figure_cat,
             marker_slider,
-            row(edit_selection_col, edit_selection_val),
-            edit_selection_submit,
+            row(edit_selection_col, edit_selection_val, edit_selection_submit),
+            edit_selecton_log,
         ),
         column(cell_markers_select, metric_select, cell_figure, stats, cell_slider),
     )
