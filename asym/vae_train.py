@@ -99,14 +99,15 @@ def loss_function(recon_x, x, mu, logvar):
     return BCE + (0.1 * KLD)
 
 
-def rotate_cell(cell):
-    mr, mc = np.where(cell == np.amax(cell))  # find brightest point
-    cr, cc = (cell.shape[0] // 2, cell.shape[1] // 2)  # wrt center
-    theta = np.arctan2(mr - cr, mc - cc)[0]  # compute angle wrt center
-    ri = rotate(cell, angle=theta * (180 / np.pi))  # scipy.ndimage.rotate
-    sd = (ri.shape[0] - cell.shape[0]) // 2  # resize to original size
-    ri = ri[..., sd : (sd + cell.shape[0]), sd : (sd + cell.shape[0])]  # crop
-    return ri
+def rotate_cell(cell, theta=None):
+    if theta is None:
+        mr, mc = np.where(cell == np.amax(cell))  # find brightest point
+        cr, cc = (cell.shape[0] // 2, cell.shape[1] // 2)  # wrt center
+        theta = np.arctan2(mr - cr, mc - cc)[0]  # compute angle wrt center
+    ri = rotate(
+        cell, angle=theta * (180 / np.pi), reshape=False
+    )  # scipy.ndimage.rotate
+    return theta, ri
 
 
 def random_transform(data):
@@ -174,7 +175,7 @@ def train_vae(
     if image_channel is not None:
         all_tiles = all_tiles[:, image_channel, :, :]
     if rotate:
-        all_tiles = np.stack([rotate_cell(i) for i in all_tiles])
+        all_tiles = np.stack([rotate_cell(i)[1] for i in all_tiles])
 
     train_dataset = vae.VAEDataset(
         all_tiles,
