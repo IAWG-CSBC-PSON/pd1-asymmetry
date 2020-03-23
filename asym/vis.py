@@ -1,5 +1,4 @@
 from functools import lru_cache
-from operator import itemgetter
 import pandas as pd
 import numpy as np
 
@@ -93,10 +92,31 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
 
     @lru_cache()
     def marker_cols(lower=False):
-        markers = list(sorted(input_data.columns))
+        markers = list(sorted(input_data.columns, key=lambda x: x.lower()))
         if lower:
             return {x.lower(): x for x in markers}
         return markers
+
+    @lru_cache()
+    def image_markers(lower=False, mapping=False):
+        if mapping:
+            return {
+                y: j
+                for j, y in sorted(
+                    (
+                        (i, x)
+                        for i, x in enumerate(image_markers(lower=lower, mapping=False))
+                    ),
+                    key=lambda x: x[1].lower(),
+                )
+            }
+        if lower:
+            return [x.lower() for x in image_markers(lower=False, mapping=False)]
+        return (
+            cell_markers
+            if cell_markers is not None
+            else [f"Marker {i + 1}" for i in range(cell_stack.shape[1])]
+        )
 
     input_data = input_data.copy()
 
@@ -199,20 +219,15 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     # Cell picture plot
     ###########################################################################
 
-    cell_markers = (
-        cell_markers
-        if cell_markers is not None
-        else [f"Marker {i + 1}" for i in range(cell_stack.shape[1])]
-    )
-    cell_markers = list(
-        (str(j), y)
-        for j, y in sorted(
-            ((i, x) for i, x in enumerate(cell_markers)), key=itemgetter(1)
-        )
-    )
-
     cell_markers_select = Select(
-        value=cell_markers[0][0], options=cell_markers, title="Marker cell image"
+        value="0",
+        options=list((str(i), x) for x, i in image_markers(mapping=True).items()),
+        title="Marker cell image",
+    )
+    cell_marker_input = AutocompleteInput(
+        completions=list(image_markers()) + list(image_markers(lower=True)),
+        min_characters=1,
+        placeholder="Search for marker",
     )
     cell_slider = RangeSlider(
         start=0, end=1, value=(0, 1), orientation="vertical", direction="rtl"
@@ -343,6 +358,17 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
         marker_select.value = new
         marker_input.value = None
 
+    def autocomplete_cell_change(attrname, old, new):
+        try:
+            idx = image_markers(mapping=True)[new]
+        except KeyError:
+            try:
+                idx = image_markers(lower=True, mapping=True)[new]
+            except KeyError:
+                return
+        cell_markers_select.value = str(idx)
+        cell_marker_input.value = None
+
     source.selected.on_change("indices", selection_change)
     marker_select.on_change("value", marker_change)
     marker_slider.on_change("value", marker_slider_change)
@@ -351,6 +377,7 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     cell_markers_select.on_change("value", selection_change)
     edit_selection_submit.on_click(mark_selection)
     marker_input.on_change("value", autocomplete_change)
+    cell_marker_input.on_change("value", autocomplete_cell_change)
 
     # set up layout
     layout = column(
@@ -362,7 +389,11 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
                 umap_figure_cat,
             ),
             column(
-                cell_markers_select, metric_select, row(cell_figure, cell_slider), stats
+                cell_markers_select,
+                cell_marker_input,
+                metric_select,
+                row(cell_figure, cell_slider),
+                stats,
             ),
         ),
         Div(text="Change data for selected cells"),
