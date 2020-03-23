@@ -350,10 +350,20 @@ def prepare_server(
             return
         if col not in input_data:
             input_data[col] = np.full(input_data.shape[0], "NA")
-        input_data.loc[
-            input_data.index[source.selected.indices], col
-        ] = edit_selection_val.value
-        edit_selecton_log.text += f'Edited {len(source.selected.indices)} cells. {col}="{edit_selection_val.value}"\n'
+        col_type = input_data[col].dtype
+        idx = source.selected.indices
+        try:
+            val = np.full(len(idx), edit_selection_val.value).astype(col_type)
+            input_data.loc[input_data.index[idx], col] = val
+        except Exception as e:
+            edit_selecton_log.text = (
+                f'Failed to edit cells. Exception: "{e}"\n' + edit_selecton_log.text
+            )
+        else:
+            edit_selecton_log.text = (
+                f'Edited {len(source.selected.indices)} cells. {col}="{edit_selection_val.value}"\n'
+                + edit_selecton_log.text
+            )
         update(update_range=False)
         old_marker_cols = set(marker_cols())
         marker_cols.cache_clear()
