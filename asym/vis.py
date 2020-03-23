@@ -70,7 +70,14 @@ def round_signif(x, n=2):
     )
 
 
-def prepare_server(doc, input_data, cell_stack, cell_markers=None):
+def prepare_server(
+    doc,
+    input_data,
+    cell_stack,
+    cell_markers=None,
+    default_umap_marker=None,
+    default_cell_marker=None,
+):
     @lru_cache()
     def get_data(m=None):
         d = input_data
@@ -123,8 +130,10 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     # Marker selection for UMAP plots
     ###########################################################################
 
+    if default_umap_marker is None:
+        default_umap_marker = marker_cols()[0]
     marker_select = Select(
-        value=marker_cols()[0], options=marker_cols(), title="Color UMAP by"
+        value=default_umap_marker, options=marker_cols(), title="Color UMAP by"
     )
     marker_input = AutocompleteInput(
         completions=marker_cols() + list(marker_cols(lower=True).keys()),
@@ -219,8 +228,13 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     # Cell picture plot
     ###########################################################################
 
+    default_cell_marker = (
+        0
+        if default_cell_marker is None
+        else image_markers(mapping=True)[default_cell_marker]
+    )
     cell_markers_select = Select(
-        value="0",
+        value=str(default_cell_marker),
         options=list((str(i), x) for x, i in image_markers(mapping=True).items()),
         title="Marker cell image",
     )

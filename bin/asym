@@ -160,7 +160,13 @@ def umap(encodings, metadata, save_path):
     help="Path to file with marker names for cell stack, one per line.",
 )
 @click.option("--port", default=5000, help="Server port.", show_default=True)
-def vis(cell_stack, cell_data, markers, port):
+@click.option(
+    "--default-umap-marker", help="Select specific marker as default for UMAP plot"
+)
+@click.option(
+    "--default-cell-marker", help="Select specific marker as default for cell plot"
+)
+def vis(cell_stack, cell_data, markers, port, default_umap_marker, default_cell_marker):
     """Visualize UMAP embedding of cells"""
     from asym.vis import prepare_server
     from bokeh.application import Application
@@ -181,6 +187,8 @@ def vis(cell_stack, cell_data, markers, port):
                     cell_stack=cell_stack,
                     input_data=input_data,
                     cell_markers=markers,
+                    default_umap_marker=default_umap_marker,
+                    default_cell_marker=default_cell_marker,
                 )
             )
         )
