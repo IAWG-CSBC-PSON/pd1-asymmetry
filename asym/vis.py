@@ -13,6 +13,8 @@ from bokeh.models import (
     Circle,
     ColorBar,
     ColumnDataSource,
+    CustomJS,
+    Div,
     HoverTool,
     PreText,
     RadioButtonGroup,
@@ -24,6 +26,41 @@ from bokeh.plotting import figure
 from bokeh.transform import linear_cmap, factor_cmap
 
 CELL_IMAGE_METRICS = (["mean", "sd", "min", "max"], [np.mean, np.std, np.min, np.max])
+
+DOWNLOAD_JS = """
+function table_to_csv(source) {
+    const columns = Object.keys(source.data)
+    const nrows = source.get_length()
+    const lines = [columns.join(',')]
+
+    for (let i = 0; i < nrows; i++) {
+        let row = [];
+        for (let j = 0; j < columns.length; j++) {
+            const column = columns[j]
+            row.push(source.data[column][i].toString())
+        }
+        lines.push(row.join(','))
+    }
+    return lines.join('\\n').concat('\\n')
+}
+
+
+const filename = 'data_result.csv'
+const filetext = table_to_csv(source)
+const blob = new Blob([filetext], { type: 'text/csv;charset=utf-8;' })
+
+//addresses IE
+if (navigator.msSaveBlob) {
+    navigator.msSaveBlob(blob, filename)
+} else {
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = filename
+    link.target = '_blank'
+    link.style.visibility = 'hidden'
+    link.dispatchEvent(new MouseEvent('click'))
+}
+"""
 
 
 def round_signif(x, n=2):
@@ -210,9 +247,14 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     edit_selection_col = TextInput(title="Column")
     edit_selection_val = TextInput(title="Value")
     edit_selection_submit = Button(
-        label="Submit", button_type="primary", align=("start", "end")
+        label="Submit change", button_type="primary", align=("start", "end")
     )
     edit_selecton_log = PreText(text="")
+
+    download_button = Button(
+        label="Download cell data", button_type="success", align=("start", "end")
+    )
+    download_button.js_on_click(CustomJS(args=dict(source=source), code=DOWNLOAD_JS))
 
     # Callbacks for buttons and widgets
     ###########################################################################
@@ -311,18 +353,26 @@ def prepare_server(doc, input_data, cell_stack, cell_markers=None):
     marker_input.on_change("value", autocomplete_change)
 
     # set up layout
-    layout = row(
-        column(
-            marker_select,
-            marker_input,
-            row(umap_figure, marker_slider),
-            umap_figure_cat,
-            row(edit_selection_col, edit_selection_val, edit_selection_submit),
-            edit_selecton_log,
+    layout = column(
+        row(
+            column(
+                marker_select,
+                marker_input,
+                row(umap_figure, marker_slider),
+                umap_figure_cat,
+            ),
+            column(
+                cell_markers_select, metric_select, row(cell_figure, cell_slider), stats
+            ),
         ),
-        column(
-            cell_markers_select, metric_select, row(cell_figure, cell_slider), stats
+        Div(text="Change data for selected cells"),
+        row(
+            edit_selection_col,
+            edit_selection_val,
+            edit_selection_submit,
+            download_button,
         ),
+        edit_selecton_log,
     )
 
     # initialize
