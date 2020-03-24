@@ -1,8 +1,11 @@
-from functools import lru_cache
+from functools import lru_cache, partial
 import pandas as pd
 import numpy as np
 
 import bokeh
+from bokeh.application import Application
+from bokeh.application.handlers.function import FunctionHandler
+from bokeh.server.server import Server
 from bokeh.palettes import viridis, inferno, Colorblind
 from bokeh.io import curdoc
 from bokeh.layouts import column, row
@@ -435,3 +438,31 @@ def prepare_server(
 
     doc.add_root(layout)
     doc.title = "UMAP projection"
+
+
+def run_server(
+    cell_stack,
+    input_data,
+    port=5000,
+    markers=None,
+    default_umap_marker=None,
+    default_cell_marker=None,
+    server_kwargs={},
+):
+    print(server_kwargs)
+    apps = {
+        "/": Application(
+            FunctionHandler(
+                partial(
+                    prepare_server,
+                    cell_stack=cell_stack,
+                    input_data=input_data,
+                    cell_markers=markers,
+                    default_umap_marker=default_umap_marker,
+                    default_cell_marker=default_cell_marker,
+                )
+            )
+        )
+    }
+    server = Server(apps, port=port, **server_kwargs)
+    server.run_until_shutdown()

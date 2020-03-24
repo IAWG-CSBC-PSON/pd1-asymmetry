@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import click
-from functools import partial
 import numpy as np
 
 
@@ -168,33 +167,40 @@ def umap(encodings, metadata, save_path):
 )
 def vis(cell_stack, cell_data, markers, port, default_umap_marker, default_cell_marker):
     """Visualize UMAP embedding of cells"""
-    from asym.vis import prepare_server
-    from bokeh.application import Application
-    from bokeh.application.handlers.function import FunctionHandler
-    from bokeh.server.server import Server
+    import asym
+    import os
     import pandas as pd
+    from asym.vis import run_server
+    from bokeh.settings import settings
+    from bokeh.server.auth_provider import AuthModule
 
     input_data = pd.read_csv(cell_data, index_col=False)
     cell_stack = np.load(cell_stack)
     if markers is not None:
         markers = [l.strip() for l in markers.readlines()]
-
-    apps = {
-        "/": Application(
-            FunctionHandler(
-                partial(
-                    prepare_server,
-                    cell_stack=cell_stack,
-                    input_data=input_data,
-                    cell_markers=markers,
-                    default_umap_marker=default_umap_marker,
-                    default_cell_marker=default_cell_marker,
-                )
-            )
-        )
-    }
-    server = Server(apps, port=port)
-    server.run_until_shutdown()
+    server_kwargs = {}
+    settings.auth_module = os.path.join(asym.__path__[0], "auth.py")
+    if settings.secret_key() is not None and settings.cookie_secret() is not None:
+        try:
+            auth_kwargs = {
+                "auth_provider": AuthModule(settings.auth_module()),
+                "secret_key": settings.secret_key(),
+                "sign_sessions": True,
+                "cookie_secret": settings.cookie_secret(),
+            }
+        except Exception as e:
+            print(f"Error setting up authentication: {e}\n")
+        else:
+            server_kwargs.update(auth_kwargs)
+    run_server(
+        cell_stack=cell_stack,
+        input_data=input_data,
+        markers=markers,
+        port=port,
+        default_umap_marker=default_umap_marker,
+        default_cell_marker=default_cell_marker,
+        server_kwargs=server_kwargs,
+    )
 
 
 if __name__ == "__main__":
