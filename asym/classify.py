@@ -51,13 +51,16 @@ class ColumnEditor:
             self.widgets["delete_button"],
             self.widgets["input_col"],
             self.widgets["input_val"],
+            self.widgets["value_row"],
         )
         self.container.children.append(widget_row)
         return widget_row
 
     def _make_delete_callback(self):
         def delete_callback():
-            idx = next(i for i, x in enumerate(self.container.children) if x is self.widget_row)
+            idx = next(
+                i for i, x in enumerate(self.container.children) if x is self.widget_row
+            )
             del self.container.children[idx]
             if self.editor_delete_callback:
                 self.editor_delete_callback(self)
@@ -65,23 +68,29 @@ class ColumnEditor:
         return delete_callback
 
     def _make_edit_widgets(self):
-        delete_button = Button(label="-", button_type="warning", align=("start", "end"))
+        delete_button = Button(
+            label="-", button_type="warning", align=("start", "end"), width=50
+        )
         delete_button.on_click(self.delete_callback)
         return {
-            "input_col": TextInput(title="Column"),
-            "input_val": TextInput(title="Value"),
+            "input_col": TextInput(title="Column", width=100),
+            "input_val": TextInput(title="Value", width=100),
             "delete_button": delete_button,
+            "value_row": row(align=("start", "end")),
+            "value_buttons": {},
         }
 
     def _make_edit_callback(self):
-        def edit_callback():
+        def edit_callback(val=None):
             data = self.source.data
             col = self.widgets["input_col"].value
-            val = self.widgets["input_val"].value
+            if val is None:
+                val = self.widgets["input_val"].value
             if col is None or col == "" or not self.source.selected:
                 return
+            self.widgets["input_col"].disabled = True
             if col not in data:
-                data[col] = np.full(len(next(iter(data.values()))), "NA")
+                data[col] = np.full(len(next(iter(data.values()))), "NA", dtype=np.object)
             col_type = data[col].dtype
             idx = self.source.selected.indices
             try:
@@ -103,8 +112,27 @@ class ColumnEditor:
                         f'Edited {len(idx)} cells. {col}="{val}"\n'
                         + self.log_widget.text
                     )
+            self._add_value_buttons(col)
 
         return edit_callback
+
+    def _add_value_buttons(self, col):
+        vals = set(self.source.data[col])
+        if len(vals) > 10:
+            if self.log_widget:
+                self.log_widget.text = (
+                    f'Too many values in "{col}". Not showing buttons'
+                    + self.log_widget.text
+                )
+            return
+        buttons = self.widgets["value_buttons"]
+        for val in vals:
+            if val in buttons:
+                continue
+            button = Button(label=val, align=("start", "end"), width=50)
+            button.on_click(partial(self.edit_callback, val=val))
+            buttons[val] = button
+            self.widgets["value_row"].children.append(button)
 
 
 def prepare_server(
@@ -205,7 +233,7 @@ def prepare_server(
         del marker_edit_instances[idx]
 
     add_marker_edit_button = Button(
-        label="+", button_type="success", align=("start", "end")
+        label="+", button_type="success", align=("start", "end"), width=50
     )
     add_marker_edit_button.on_click(add_marker_edit_callback)
 
@@ -272,9 +300,7 @@ def prepare_server(
         if not new_keys:
             return
         for n in new_keys:
-            data_table.columns.append(
-                TableColumn(field=n, title=n)
-            )
+            data_table.columns.append(TableColumn(field=n, title=n))
 
     def edit_selection():
         for x in marker_edit_instances:
@@ -289,19 +315,21 @@ def prepare_server(
     edit_selection_submit.on_click(edit_selection)
 
     # set up layout
-    layout = row(
-        column(data_table),
-        column(
-            cell_markers_select,
-            cell_marker_input,
-            metric_select,
-            row(cell_figure, cell_slider),
-            stats,
-            add_marker_edit_button,
-            marker_edit_container,
-            row(edit_selection_submit, download_button),
-            edit_selecton_log
+    layout = column(
+        row(
+            column(data_table),
+            column(
+                cell_markers_select,
+                cell_marker_input,
+                metric_select,
+                row(cell_figure, cell_slider),
+                stats,
+            ),
         ),
+        marker_edit_container,
+        add_marker_edit_button,
+        row(edit_selection_submit, download_button),
+        edit_selecton_log,
     )
 
     doc.add_root(layout)
