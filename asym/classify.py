@@ -49,11 +49,19 @@ CUSTOM_CSS = r"""
 
 
 class ColumnEditor:
-    def __init__(self, source, container, log_widget=None, editor_delete_callback=None):
+    def __init__(
+        self,
+        source,
+        container,
+        log_widget=None,
+        editor_delete_callback=None,
+        external_edit_callback=None,
+    ):
         self.source = source
         self.container = container
         self.log_widget = log_widget
         self.editor_delete_callback = editor_delete_callback
+        self.external_edit_callback = external_edit_callback
         self.edit_callback = self._make_edit_callback()
         self.delete_callback = self._make_delete_callback()
         self.widgets = self._make_edit_widgets()
@@ -96,7 +104,7 @@ class ColumnEditor:
     def _log(self, text):
         if self.log_widget:
             new_text = text + self.log_widget.value
-            self.log_widget.value = new_text[:min(1000, len(new_text))]
+            self.log_widget.value = new_text[: min(1000, len(new_text))]
 
     def _make_edit_callback(self):
         def edit_callback(val=None):
@@ -124,6 +132,8 @@ class ColumnEditor:
                 self._log(f'Failed to edit cells. Exception: "{e}"\n')
             else:
                 self._log(f'Edited {len(idx)} cells. {col}="{val}"\n')
+                if self.external_edit_callback:
+                    self.external_edit_callback()
             self._add_value_buttons(col)
 
         return edit_callback
@@ -237,6 +247,7 @@ def prepare_server(
             marker_edit_container,
             log_widget=edit_selecton_log,
             editor_delete_callback=delete_marker_edit_callback,
+            external_edit_callback=edit_selection_callback,
         )
         marker_edit_instances.append(editor)
 
@@ -259,7 +270,9 @@ def prepare_server(
     )
     download_button.js_on_click(CustomJS(args=dict(source=source), code=DOWNLOAD_JS))
 
-    edit_selecton_log = TextAreaInput(value="", disabled=True, css_classes=["edit_log"], cols=30, rows=10)
+    edit_selecton_log = TextAreaInput(
+        value="", disabled=True, css_classes=["edit_log"], cols=30, rows=10
+    )
 
     upload_file_input = FileInput(accept="text/csv", align=("end", "end"))
 
@@ -313,9 +326,20 @@ def prepare_server(
         for n in new_keys:
             data_table.columns.append(TableColumn(field=n, title=n))
 
-    def edit_selection():
+    def edit_selection_submit_click():
         for x in marker_edit_instances:
             x.edit_callback()
+
+    def edit_selection_callback():
+        idx = source.selected.indices
+        try:
+            if len(idx) == 1 and all(
+                source.data[x.widgets["input_col"].value][idx] != "NA"
+                for x in marker_edit_instances
+            ):
+                source.selected.indices = [idx[0] + 1]
+        except KeyError:
+            pass
 
     def upload_file_callback(attrname, old, new):
         try:
@@ -336,7 +360,7 @@ def prepare_server(
     metric_select.on_change("active", selection_change)
     cell_markers_select.on_change("value", selection_change)
     cell_marker_input.on_change("value", autocomplete_cell_change)
-    edit_selection_submit.on_click(edit_selection)
+    edit_selection_submit.on_click(edit_selection_submit_click)
     upload_file_input.on_change("value", upload_file_callback)
 
     style_div = Div(text=CUSTOM_CSS)
