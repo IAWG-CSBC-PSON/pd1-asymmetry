@@ -93,7 +93,9 @@ class ColumnEditor:
                 return
             self.widgets["input_col"].disabled = True
             if col not in data:
-                data[col] = np.full(len(next(iter(data.values()))), "NA", dtype=np.object)
+                data[col] = np.full(
+                    len(next(iter(data.values()))), "NA", dtype=np.object
+                )
             col_type = data[col].dtype
             idx = self.source.selected.indices
             try:
@@ -257,9 +259,7 @@ def prepare_server(
     # Cell table
     ###########################################################################
 
-    default_data_table_cols = [
-        TableColumn(field="marked", title="Seen", width=20),
-    ]
+    default_data_table_cols = [TableColumn(field="marked", title="Seen", width=20)]
 
     data_table = DataTable(source=source, columns=default_data_table_cols, width=800)
 
@@ -321,7 +321,8 @@ def prepare_server(
         except Exception:
             file_name_text.text = f"Error loading file {upload_file_input.filename}"
             return
-        input_data["marked"] = np.full(input_data.shape[0], "")
+        if "marked" not in data:
+            data["marked"] = np.full(data.shape[0], "")
         file_name_text.text = f"Editing file {upload_file_input.filename}"
         data_table.columns = default_data_table_cols
         source.data = data

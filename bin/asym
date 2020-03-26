@@ -165,7 +165,16 @@ def umap(encodings, metadata, save_path):
 @click.option(
     "--default-cell-marker", help="Select specific marker as default for cell plot"
 )
-def vis(cell_stack, cell_data, markers, port, default_umap_marker, default_cell_marker):
+@click.option("--url-prefix", help="Add prefix to all URLS")
+def vis(
+    cell_stack,
+    cell_data,
+    markers,
+    port,
+    default_umap_marker,
+    default_cell_marker,
+    url_prefix,
+):
     """Visualize UMAP embedding of cells"""
     import asym
     import os
@@ -180,6 +189,9 @@ def vis(cell_stack, cell_data, markers, port, default_umap_marker, default_cell_
         markers = [l.strip() for l in markers.readlines()]
     server_kwargs = {}
     settings.auth_module = os.path.join(asym.__path__[0], "auth.py")
+    if url_prefix:
+        server_kwargs["prefix"] = url_prefix
+        asym.url_prefix = url_prefix
     if settings.secret_key() is not None and settings.cookie_secret() is not None:
         try:
             auth_kwargs = {
@@ -216,7 +228,8 @@ def vis(cell_stack, cell_data, markers, port, default_umap_marker, default_cell_
 @click.option(
     "--default-cell-marker", help="Select specific marker as default for cell plot"
 )
-def classify(cell_stack, cell_data, markers, port, default_cell_marker):
+@click.option("--url-prefix", help="Add prefix to all URLS")
+def classify(cell_stack, cell_data, markers, port, default_cell_marker, url_prefix):
     """Manually classify cells"""
     import asym
     import os
@@ -230,6 +243,9 @@ def classify(cell_stack, cell_data, markers, port, default_cell_marker):
     if markers is not None:
         markers = [l.strip() for l in markers.readlines()]
     server_kwargs = {}
+    if url_prefix:
+        server_kwargs["prefix"] = url_prefix
+        asym.url_prefix = url_prefix
     settings.auth_module = os.path.join(asym.__path__[0], "auth.py")
     if settings.secret_key() is not None and settings.cookie_secret() is not None:
         try:

@@ -1,11 +1,17 @@
+import asym
 from tornado.web import RequestHandler
+
+try:
+    prefix = "/" + asym.url_prefix
+except AttributeError:
+    prefix = ""
 
 login_url = "/login"
 
-LOGIN_HTML = r"""
+LOGIN_HTML = fr"""
 <html>
 <body>
-<form action="/login" method="post">
+<form action="{prefix}/login" method="post">
 Token: <input type="text" name="token">
 <input type="submit" value="Sign in">
 </form>
@@ -17,7 +23,7 @@ try:
     with open("valid_tokens", "r") as f:
         valid_tokens = {x.strip() for x in f.readlines()}
 except FileNotFoundError:
-    pass
+    valid_tokens = set()
 
 
 class LoginHandler(RequestHandler):
@@ -31,10 +37,13 @@ class LoginHandler(RequestHandler):
         token = self.get_argument("token")
         if token in valid_tokens:
             self.set_secure_cookie("user", token)
-            self.redirect("/")
+            self.redirect(prefix + "/")
             return
-        self.redirect("/login")
+        self.redirect(prefix + "/login")
 
 
 def get_user(request_handler):
-    return request_handler.get_secure_cookie("user")
+    user = request_handler.get_secure_cookie("user")
+    if not user:
+        request_handler.redirect(prefix + "/login")
+    return user
