@@ -1,4 +1,6 @@
+from base64 import b64decode
 from functools import lru_cache, partial
+from io import BytesIO
 import pandas as pd
 import numpy as np
 
@@ -19,6 +21,7 @@ from bokeh.models import (
     CustomJS,
     DataTable,
     Div,
+    FileInput,
     HoverTool,
     PreText,
     RadioButtonGroup,
@@ -232,6 +235,8 @@ def prepare_server(
         idx = next(i for i, x in enumerate(marker_edit_instances) if x is editor)
         del marker_edit_instances[idx]
 
+    file_name_text = Div()
+
     add_marker_edit_button = Button(
         label="+", button_type="success", align=("start", "end"), width=50
     )
@@ -241,21 +246,22 @@ def prepare_server(
         label="Submit change", button_type="primary", align=("start", "end")
     )
     download_button = Button(
-        label="Download cell data", button_type="success", align=("start", "end")
+        label="Download edited data", button_type="success", align=("start", "end")
     )
     download_button.js_on_click(CustomJS(args=dict(source=source), code=DOWNLOAD_JS))
 
     edit_selecton_log = PreText(text="")
 
+    upload_file_input = FileInput(accept="text/csv", align=("end", "end"))
+
     # Cell table
     ###########################################################################
 
-    data_table_cols = [
-        TableColumn(field="index", title="Index", width=50),
+    default_data_table_cols = [
         TableColumn(field="marked", title="Seen", width=20),
     ]
 
-    data_table = DataTable(source=source, columns=data_table_cols, width=800)
+    data_table = DataTable(source=source, columns=default_data_table_cols, width=800)
 
     # Callbacks for buttons and widgets
     ###########################################################################
@@ -305,6 +311,20 @@ def prepare_server(
     def edit_selection():
         for x in marker_edit_instances:
             x.edit_callback()
+        if len(source.selected.indices) == 1:
+            source.selected.indices = [source.selected.indices[0] + 1]
+
+    def upload_file_callback(attrname, old, new):
+        try:
+            data_text = b64decode(new)
+            data = pd.read_csv(BytesIO(data_text))
+        except Exception:
+            file_name_text.text = f"Error loading file {upload_file_input.filename}"
+            return
+        input_data["marked"] = np.full(input_data.shape[0], "")
+        file_name_text.text = f"Editing file {upload_file_input.filename}"
+        data_table.columns = default_data_table_cols
+        source.data = data
 
     source.selected.on_change("indices", selection_change)
     source.on_change("data", data_change)
@@ -313,6 +333,7 @@ def prepare_server(
     cell_markers_select.on_change("value", selection_change)
     cell_marker_input.on_change("value", autocomplete_cell_change)
     edit_selection_submit.on_click(edit_selection)
+    upload_file_input.on_change("value", upload_file_callback)
 
     # set up layout
     layout = column(
@@ -326,9 +347,10 @@ def prepare_server(
                 stats,
             ),
         ),
+        file_name_text,
         marker_edit_container,
         add_marker_edit_button,
-        row(edit_selection_submit, download_button),
+        row(edit_selection_submit, download_button, upload_file_input),
         edit_selecton_log,
     )
 
