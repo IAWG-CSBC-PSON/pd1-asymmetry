@@ -28,6 +28,7 @@ from bokeh.models import (
     RangeSlider,
     Select,
     TableColumn,
+    TextAreaInput,
     TextInput,
 )
 from bokeh.plotting import figure
@@ -36,6 +37,15 @@ from bokeh.transform import linear_cmap, factor_cmap
 from .common import DOWNLOAD_JS, round_signif
 
 CELL_IMAGE_METRICS = (["mean", "sd", "min", "max"], [np.mean, np.std, np.min, np.max])
+
+CUSTOM_CSS = r"""
+<style>
+.edit_log textarea.bk {
+    overflow-y: scroll;
+    font-family: Courier, Monaco, monospace;
+}
+</style>
+"""
 
 
 class ColumnEditor:
@@ -76,12 +86,17 @@ class ColumnEditor:
         )
         delete_button.on_click(self.delete_callback)
         return {
-            "input_col": TextInput(title="Column", width=100),
+            "input_col": TextInput(title="Column", width=150),
             "input_val": TextInput(title="Value", width=100),
             "delete_button": delete_button,
             "value_row": row(align=("start", "end")),
             "value_buttons": {},
         }
+
+    def _log(self, text):
+        if self.log_widget:
+            new_text = text + self.log_widget.value
+            self.log_widget.value = new_text[:min(1000, len(new_text))]
 
     def _make_edit_callback(self):
         def edit_callback(val=None):
@@ -106,17 +121,9 @@ class ColumnEditor:
                 marked_data[idx] = "✓"
                 data["marked"] = marked_data
             except Exception as e:
-                if self.log_widget:
-                    self.log_widget.text = (
-                        f'Failed to edit cells. Exception: "{e}"\n'
-                        + self.log_widget.text
-                    )
+                self._log(f'Failed to edit cells. Exception: "{e}"\n')
             else:
-                if self.log_widget:
-                    self.log_widget.text = (
-                        f'Edited {len(idx)} cells. {col}="{val}"\n'
-                        + self.log_widget.text
-                    )
+                self._log(f'Edited {len(idx)} cells. {col}="{val}"\n')
             self._add_value_buttons(col)
 
         return edit_callback
@@ -124,19 +131,19 @@ class ColumnEditor:
     def _add_value_buttons(self, col):
         vals = set(self.source.data[col])
         if len(vals) > 10:
-            if self.log_widget:
-                self.log_widget.text = (
-                    f'Too many values in "{col}". Not showing buttons'
-                    + self.log_widget.text
-                )
+            self._log(f'Too many values in "{col}". Not showing buttons')
             return
         buttons = self.widgets["value_buttons"]
-        for val in vals:
-            if val in buttons:
-                continue
-            button = Button(label=val, align=("start", "end"), width=50)
-            button.on_click(partial(self.edit_callback, val=val))
-            buttons[val] = button
+        if all(v in buttons for v in vals):
+            return
+        self.widgets["value_row"].children = []
+        for val in sorted(vals):
+            try:
+                button = buttons[val]
+            except KeyError:
+                button = Button(label=val, align=("start", "end"), width=50)
+                button.on_click(partial(self.edit_callback, val=val))
+                buttons[val] = button
             self.widgets["value_row"].children.append(button)
 
 
@@ -252,7 +259,7 @@ def prepare_server(
     )
     download_button.js_on_click(CustomJS(args=dict(source=source), code=DOWNLOAD_JS))
 
-    edit_selecton_log = PreText(text="")
+    edit_selecton_log = TextAreaInput(value="", disabled=True, css_classes=["edit_log"], cols=30, rows=10)
 
     upload_file_input = FileInput(accept="text/csv", align=("end", "end"))
 
@@ -303,16 +310,12 @@ def prepare_server(
 
     def data_change(attrname, old, new):
         new_keys = [n for n in new.keys() if n not in set(old.keys())]
-        if not new_keys:
-            return
         for n in new_keys:
             data_table.columns.append(TableColumn(field=n, title=n))
 
     def edit_selection():
         for x in marker_edit_instances:
             x.edit_callback()
-        if len(source.selected.indices) == 1:
-            source.selected.indices = [source.selected.indices[0] + 1]
 
     def upload_file_callback(attrname, old, new):
         try:
@@ -336,6 +339,8 @@ def prepare_server(
     edit_selection_submit.on_click(edit_selection)
     upload_file_input.on_change("value", upload_file_callback)
 
+    style_div = Div(text=CUSTOM_CSS)
+
     # set up layout
     layout = column(
         row(
@@ -353,6 +358,7 @@ def prepare_server(
         add_marker_edit_button,
         row(edit_selection_submit, download_button, upload_file_input),
         edit_selecton_log,
+        style_div,
     )
 
     doc.add_root(layout)
