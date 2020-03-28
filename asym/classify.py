@@ -1,6 +1,7 @@
 from base64 import b64decode
 from functools import lru_cache, partial
 from io import BytesIO
+import json
 import pandas as pd
 import numpy as np
 
@@ -157,6 +158,10 @@ class ColumnEditor:
             self.widgets["value_row"].children.append(button)
 
 
+def parse_contour(contour):
+    return list(zip(*(zip(*json.loads(x)) for x in contour)))
+
+
 def prepare_server(
     doc, input_data, cell_stack, cell_markers=None, default_cell_marker=None
 ):
@@ -181,17 +186,42 @@ def prepare_server(
             else [f"Marker {i + 1}" for i in range(cell_stack.shape[1])]
         )
 
-    input_data = input_data.copy()
-    input_data["marked"] = np.full(input_data.shape[0], "")
-
     # Data sources
     ###########################################################################
 
-    source = ColumnDataSource(data=input_data)
-    image_source = ColumnDataSource(data=dict(image=[], dw=[], dh=[]))
+    def prepare_data(input_data):
+        data = input_data.copy()
+        if "contour" in data and not all(x in data for x in ["contour_x", "contour_y"]):
+            contour = parse_contour(data["contour"])
+            data["contour_x"] = contour[0]
+            data["contour_y"] = contour[1]
+        if "marked" not in data:
+            data["marked"] = np.full(data.shape[0], "")
+        source.data = data
+
+    source = ColumnDataSource(data={})
+    prepare_data(input_data)
+    image_source = ColumnDataSource(data=dict(image=[], dw=[], dh=[], contour_x=[], contour_y=[]))
 
     # Cell picture plot
     ###########################################################################
+
+    def add_outline():
+        data = source.data
+        if all(x in data for x in ["contour_x", "contour_y"]):
+            cell_outline = cell_figure.patches(
+                xs="contour_x",
+                ys="contour_y",
+                fill_color=None,
+                line_color="red",
+                name="cell_outline",
+                source=image_source,
+            )
+            cell_outline.level = "overlay"
+        else:
+            cell_outline = cell_figure.select(name="cell_outline")
+            for x in cell_outline:
+                cell_figure.renderers.remove(x)
 
     default_cell_marker = (
         0
@@ -233,6 +263,7 @@ def prepare_server(
         dh="dh",
         source=image_source,
     )
+    add_outline()
     cell_figure.add_layout(cell_color_bar, "right")
 
     # Edit data of selected cells
@@ -298,11 +329,18 @@ def prepare_server(
         mean_image = CELL_IMAGE_METRICS[1][metric_select.active](
             cell_stack[selected, int(cell_markers_select.value), :, :], axis=0
         )
-        image_source.data = {
+        image_data = {
             "image": [mean_image],
-            "dw": [cell_stack.shape[1]],
-            "dh": [cell_stack.shape[2]],
+            "dw": [cell_stack.shape[2]],
+            "dh": [cell_stack.shape[3]],
         }
+        for coord in ["contour_x", "contour_y"]:
+            try:
+                image_data[coord] = list(data[coord][selected])
+                print(image_data[coord])
+            except KeyError:
+                pass
+        image_source.data = image_data
         image_extr = round_signif(mean_image.min()), round_signif(mean_image.max())
         cell_slider.start = image_extr[0]
         cell_slider.end = image_extr[1]
@@ -348,11 +386,10 @@ def prepare_server(
         except Exception:
             file_name_text.text = f"Error loading file {upload_file_input.filename}"
             return
-        if "marked" not in data:
-            data["marked"] = np.full(data.shape[0], "")
         file_name_text.text = f"Editing file {upload_file_input.filename}"
         data_table.columns = default_data_table_cols
-        source.data = data
+        prepare_data(data)
+        add_outline()
 
     source.selected.on_change("indices", selection_change)
     source.on_change("data", data_change)
