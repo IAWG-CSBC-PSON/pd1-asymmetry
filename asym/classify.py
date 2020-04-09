@@ -337,7 +337,6 @@ def prepare_server(
         for coord in ["contour_x", "contour_y"]:
             try:
                 image_data[coord] = list(data[coord][selected])
-                print(image_data[coord])
             except KeyError:
                 pass
         image_source.data = image_data
@@ -387,6 +386,12 @@ def prepare_server(
             file_name_text.text = f"Error loading file {upload_file_input.filename}"
             return
         file_name_text.text = f"Editing file {upload_file_input.filename}"
+        # Have to regenerate contours
+        try:
+            del data["contour_x"]
+            del data["contour_y"]
+        except KeyError:
+            pass
         data_table.columns = default_data_table_cols
         prepare_data(data)
         add_outline()

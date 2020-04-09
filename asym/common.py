@@ -10,7 +10,9 @@ function table_to_csv(source) {
         let row = [];
         for (let j = 0; j < columns.length; j++) {
             const column = columns[j]
-            row.push(source.data[column][i].toString())
+            const entry = source.data[column][i].toString()
+            const terminator = (entry.includes(',') ? '"' : '')
+            row.push(terminator + entry + terminator)
         }
         lines.push(row.join(','))
     }
