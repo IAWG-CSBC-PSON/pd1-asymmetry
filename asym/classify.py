@@ -104,7 +104,7 @@ class ColumnEditor:
 
     def _log(self, text):
         if self.log_widget:
-            new_text = text + self.log_widget.value
+            new_text = text + "\n" + self.log_widget.value
             self.log_widget.value = new_text[: min(1000, len(new_text))]
 
     def _make_edit_callback(self):
@@ -130,9 +130,9 @@ class ColumnEditor:
                 marked_data[idx] = "✓"
                 data["marked"] = marked_data
             except Exception as e:
-                self._log(f'Failed to edit cells. Exception: "{e}"\n')
+                self._log(f'Failed to edit cells. Exception: "{e}"')
             else:
-                self._log(f'Edited {len(idx)} cells. {col}="{val}"\n')
+                self._log(f'Edited {len(idx)} cells. {col}="{val}"')
                 if self.external_edit_callback:
                     self.external_edit_callback()
             self._add_value_buttons(col)
@@ -140,7 +140,7 @@ class ColumnEditor:
         return edit_callback
 
     def _add_value_buttons(self, col):
-        vals = set(self.source.data[col])
+        vals = set(str(v) for v in self.source.data[col])
         if len(vals) > 10:
             self._log(f'Too many values in "{col}". Not showing buttons')
             return
