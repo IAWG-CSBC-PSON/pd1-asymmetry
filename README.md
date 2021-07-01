@@ -35,7 +35,9 @@ While the server is running, browse to localhost:5000 in any webbrowser to acces
 
 ## PD1 asymmetry project
 
-THe pd1_project folder contains multiple Jupyter notebooks for the pre-processing
+Data for the PD1 project are available at https://www.synapse.org/#!Synapse:syn22009464/files/.
+
+The pd1_project folder contains multiple Jupyter notebooks for the pre-processing
 and analysis of the PD1 asymmetry project. In order to run them, several dependencies need
 to be installed:
 
